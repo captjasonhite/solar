@@ -306,8 +306,9 @@ function halo(x,y,r,cls='a-halo anim-halo',delay=0){
 function noZone(x,y,w,h,rx=6){
   return `<rect class="z-nozone" x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}"></rect>`;
 }
-function label(x,y,t,anchor='middle'){
-  return `<text class="z-label" x="${x}" y="${y}" text-anchor="${anchor}">${t}</text>`;
+function label(x,y,t,anchor='middle',flip=false){
+  if(!flip) return `<text class="z-label" x="${x}" y="${y}" text-anchor="${anchor}">${t}</text>`;
+  return `<g transform="translate(${x} ${y}) scale(-1 1)"><text class="z-label" x="0" y="0" text-anchor="${anchor}">${t}</text></g>`;
 }
 function badge(x,y,txt){
   return `<circle class="z-badge-bg" cx="${x}" cy="${y}" r="15"></circle><text class="z-badge" x="${x}" y="${y+4.5}" text-anchor="middle">${txt}</text>`;
@@ -452,9 +453,9 @@ const DIAGRAMS = {
       <g transform="translate(214 90)">${arc(0,0,20,-30,150)}</g>
       ${hand(188,90,0,.8,'h-palm anim-knead',.6)}
       ${hand(212,90,0,.8,'h-palm anim-knead',1.2)}
-      ${label(150,80,'HAMSTRING')}
-      ${label(258,196,'CALF')}
-      ${label(200,296,'ACHILLES — NO PRESSURE')}`;
+      ${label(150,80,'HAMSTRING','middle',flip)}
+      ${label(258,196,'CALF','middle',flip)}
+      ${label(200,296,'ACHILLES — NO PRESSURE','middle',flip)}`;
     return { svg: wrap(flipG(flip, shapes) + badge(36,36,side) + label(36,62, side==='L'?'LEFT':'RIGHT')),
              aria:`${side==='L'?'Left':'right'} posterior leg, strokes toward thigh and kneading` };
   },
@@ -471,8 +472,8 @@ const DIAGRAMS = {
       ${arc(200,200,52,20,160,'a-arc','url(#ah-amber)')}
       ${hand(148,200,-70,.8,'h-palm anim-press',0)}
       ${hand(252,200,70,.8,'h-palm anim-press',.8)}
-      ${label(200,288,'ACHILLES — NO PRESSURE')}
-      ${label(200,12,'LOWER LEG')}`;
+      ${label(200,288,'ACHILLES — NO PRESSURE','middle',flip)}
+      ${label(200,12,'LOWER LEG','middle',flip)}`;
     return { svg: wrap(flipG(flip, shapes) + badge(36,36,side) + label(36,62, side==='L'?'LEFT':'RIGHT')),
              aria:`${side==='L'?'Left':'right'} ankle, gentle strokes around the heel, avoiding the Achilles tendon` };
   },
@@ -486,8 +487,8 @@ const DIAGRAMS = {
       <path class="a-arrow-soft" d="M196,236 Q186,160 210,84" marker-end="url(#ah-light)" style="stroke-dasharray:5 7"></path>
       <g transform="translate(206 150)">${arc(0,0,26,0,320,'a-arc','url(#ah-amber)')}</g>
       <g transform="translate(206 150)"><g class="anim-orbit" style="--spd:2.4s"><ellipse class="h-thumb" cx="0" cy="-14" rx="13" ry="8.5"></ellipse></g></g>
-      ${label(200,290,'PLANTAR FASCIA')}
-      ${label(120,90,'HEEL')}`;
+      ${label(200,290,'PLANTAR FASCIA','middle',flip)}
+      ${label(120,90,'HEEL','middle',flip)}`;
     return { svg: wrap(flipG(flip, shapes) + badge(36,36,side) + label(36,62, side==='L'?'LEFT':'RIGHT')),
              aria:`${side==='L'?'Left':'right'} foot sole, thumb circles along the plantar surface` };
   },
@@ -531,9 +532,9 @@ const DIAGRAMS = {
       ${noZone(208,168,12,78,6)}
       <g style="--dy:-96px;--spd:3.2s">${hand(200,244,0,.9,'h-palm anim-stroke',0)}</g>
       ${arrow(240,238,240,146)}
-      ${label(146,80,'QUADRICEPS')}
-      ${label(262,208,'TIBIA — NO PRESSURE')}
-      ${label(200,296,'ANKLE')}`;
+      ${label(146,80,'QUADRICEPS','middle',flip)}
+      ${label(262,208,'TIBIA — NO PRESSURE','middle',flip)}
+      ${label(200,296,'ANKLE','middle',flip)}`;
     return { svg: wrap(flipG(flip, shapes) + badge(36,36,side) + label(36,62, side==='L'?'LEFT':'RIGHT')),
              aria:`${side==='L'?'Left':'right'} front of leg, broad strokes up the quadriceps` };
   },
@@ -546,8 +547,8 @@ const DIAGRAMS = {
       <rect class="z-hl-core" x="172" y="52" width="16" height="150" rx="8"></rect>
       <g style="--dy:-120px;--spd:3s">${hand(180,196,0,.8,'h-palm anim-stroke',0)}</g>
       ${arrow(150,200,150,80,'a-arrow-soft')}
-      ${label(200,278,'TIBIA — NO PRESSURE')}
-      ${label(120,120,'TIBIALIS ANT.')}`;
+      ${label(200,278,'TIBIA — NO PRESSURE','middle',flip)}
+      ${label(120,120,'TIBIALIS ANT.','middle',flip)}`;
     return { svg: wrap(flipG(flip, shapes) + badge(36,36,side) + label(36,62, side==='L'?'LEFT':'RIGHT')),
              aria:`${side==='L'?'Left':'right'} shin, light strokes on the muscle beside the tibia` };
   },
@@ -563,7 +564,7 @@ const DIAGRAMS = {
       ${arc(200,176,44,-40,80)}
       ${hand(150,176,-80,.75,'h-palm anim-press',0)}
       ${hand(250,176,80,.75,'h-palm anim-press',.8)}
-      ${label(200,292,'SMALL CIRCLES • WITHIN RANGE')}`;
+      ${label(200,292,'SMALL CIRCLES • WITHIN RANGE','middle',flip)}`;
     return { svg: wrap(flipG(flip, shapes) + badge(36,36,side) + label(36,62, side==='L'?'LEFT':'RIGHT')),
              aria:`${side==='L'?'Left':'right'} ankle joint mobilization with small circles within comfortable range` };
   },
@@ -578,8 +579,8 @@ const DIAGRAMS = {
       <rect class="z-body" x="190" y="244" width="20" height="40" rx="10"></rect>
       <g style="--dy:96px;--spd:3s">${hand(200,120,180,.85,'h-palm anim-stroke',0)}</g>
       ${arrow(248,120,248,224)}
-      ${label(150,70,'DELTOID')}
-      ${label(252,180,'UPPER ARM')}`;
+      ${label(150,70,'DELTOID','middle',flip)}
+      ${label(252,180,'UPPER ARM','middle',flip)}`;
     return { svg: wrap(flipG(flip, shapes) + badge(36,36,side) + label(36,62, side==='L'?'LEFT':'RIGHT')),
              aria:`${side==='L'?'Left':'right'} upper arm, broad strokes from shoulder toward elbow` };
   },
@@ -594,8 +595,8 @@ const DIAGRAMS = {
       <rect class="z-body" x="192" y="224" width="16" height="44" rx="8"></rect>
       ${arrow(246,236,246,96)}
       <g style="--dy:-118px;--spd:2.8s">${thumb(200,220,0,'h-thumb anim-stroke',0)}</g>
-      ${label(200,288,'WRIST')}
-      ${label(140,120,'FLEXORS')}`;
+      ${label(200,288,'WRIST','middle',flip)}
+      ${label(140,120,'FLEXORS','middle',flip)}`;
     return { svg: wrap(flipG(flip, shapes) + badge(36,36,side) + label(36,62, side==='L'?'LEFT':'RIGHT') + label(200,12,'PALM SIDE — FLEXORS')),
              aria:`${side==='L'?'Left':'right'} forearm palm side, thumb stripping along flexors toward the elbow` };
   },
@@ -609,8 +610,8 @@ const DIAGRAMS = {
       <rect class="z-body" x="192" y="224" width="16" height="44" rx="8"></rect>
       ${arrow(246,236,246,96)}
       <g style="--dy:-118px;--spd:2.8s">${thumb(200,220,0,'h-thumb anim-stroke',0)}</g>
-      ${label(200,288,'WRIST')}
-      ${label(140,120,'EXTENSORS')}`;
+      ${label(200,288,'WRIST','middle',flip)}
+      ${label(140,120,'EXTENSORS','middle',flip)}`;
     return { svg: wrap(flipG(flip, shapes) + badge(36,36,side) + label(36,62, side==='L'?'LEFT':'RIGHT') + label(200,12,'BACK SIDE — EXTENSORS')),
              aria:`${side==='L'?'Left':'right'} forearm back side, thumb stripping along extensors toward the elbow` };
   },
@@ -628,8 +629,8 @@ const DIAGRAMS = {
       <path class="z-hl-core" d="M254,214 Q254,242 228,246 Q210,248 206,230 Q204,210 222,204 Q242,200 254,214 Z"></path>
       <g transform="translate(200 176)">${arc(0,0,30,0,320,'a-arc','url(#ah-amber)')}</g>
       <g transform="translate(200 176)"><g class="anim-orbit" style="--spd:2.4s"><ellipse class="h-thumb" cx="0" cy="-16" rx="13" ry="8.5"></ellipse></g></g>
-      ${label(162,272,'THENAR')}
-      ${label(238,272,'HYPOTHENAR')}`;
+      ${label(162,272,'THENAR','middle',flip)}
+      ${label(238,272,'HYPOTHENAR','middle',flip)}`;
     return { svg: wrap(flipG(flip, shapes) + badge(36,36,side) + label(36,62, side==='L'?'LEFT':'RIGHT')),
              aria:`${side==='L'?'Left':'right'} palm with slow thumb circles over thenar and hypothenar` };
   },
@@ -745,7 +746,7 @@ const els = {
   tbRegion:$('tb-region'), tbTimer:$('tb-timer'), tbElapsed:$('tb-elapsed'),
   progressFill:$('progress-fill'), diagram:$('diagram'), caption:$('diagram-caption'),
   region:$('info-region'), title:$('info-title'), instr:$('info-instr'),
-  pressure:$('info-pressure'), direction:$('info-direction'), time:$('info-time'),
+  pressure:$('info-pressure'), direction:$('info-direction'),
   next:$('info-next'), safety:$('info-safety'),
   btnPause:$('btn-pause'),
   ovTransition:$('ov-transition'), ovTransitionDiagram:$('ov-transition-diagram'),
@@ -821,7 +822,6 @@ function renderSegment(){
   els.instr.textContent = seg.instruction;
   els.pressure.textContent = pressureDots(seg.pressure);
   els.direction.textContent = seg.direction;
-  els.time.textContent = fmt(seg.dur*1000);
   const n = SEGMENTS[state.segIndex+1];
   els.next.innerHTML = n ? `Next: <b>${n.title}</b>${n.side?` (${n.side})`:''}` : 'Final segment';
   if(seg.safety){ els.safety.textContent = '⚠ ' + seg.safety; els.safety.classList.remove('hidden'); }
