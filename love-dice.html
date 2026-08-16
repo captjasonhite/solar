@@ -135,6 +135,11 @@ body.spicy .chip.spicy{display:inline-block}
 (function(){
 'use strict';
 
+window.addEventListener('error', function(e){
+  var el = document.getElementById('gateStatus');
+  if (el) el.textContent = 'Load error: ' + (e.message || e.type);
+});
+
 var ACTIONS = ['Kiss','Massage','Caress','Nibble','Tease','Tickle'];
 var ACTIONS_SPICY = ['Kiss','Suck','Caress','Nipples','Massage','Tease'];
 var PARTS = ['Neck','Earlobe','Lips','Shoulders','Back','Thighs'];
@@ -485,32 +490,52 @@ function startMotion(){
 
 function closeGate(status){
   gate.classList.add('hidden');
-  if (status) gateStatus.textContent = status;
+  if (status) motionHint.textContent = status;
 }
 
-document.getElementById('enableMotion').addEventListener('click', function(){
-  var btn = this;
-  btn.disabled = true;
-  var finish = function(granted){
-    btn.disabled = false;
+function requestMotion(){
+  var status = document.getElementById('gateStatus');
+  var gateBtn = document.getElementById('enableMotion');
+  if (gateBtn) gateBtn.disabled = true;
+  if (status) status.textContent = 'Requesting motion access\u2026';
+  var done = false;
+  var finish = function(granted, msg){
+    if (done) return;
+    done = true;
+    if (gateBtn) gateBtn.disabled = false;
     if (granted){
       startMotion();
       closeGate();
     } else {
-      closeGate('Motion denied \u2014 use Tap to Roll');
+      closeGate(msg || 'Motion unavailable \u2014 use Tap to Roll');
     }
   };
-  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function'){
-    DeviceMotionEvent.requestPermission().then(function(r){ finish(r === 'granted'); })
-      .catch(function(){ finish(false); });
-  } else {
-    startMotion();
-    closeGate();
+  var timer = setTimeout(function(){ finish(false, 'No response from phone \u2014 use Tap to Roll'); }, 8000);
+  try {
+    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function'){
+      DeviceMotionEvent.requestPermission().then(
+        function(r){ clearTimeout(timer); finish(r === 'granted'); },
+        function(){ clearTimeout(timer); finish(false, 'Motion blocked \u2014 use Tap to Roll'); }
+      );
+    } else {
+      clearTimeout(timer);
+      startMotion();
+      closeGate();
+    }
+  } catch(err){
+    clearTimeout(timer);
+    finish(false, (err && err.message) || 'Motion error \u2014 use Tap to Roll');
   }
-});
+}
 
+document.getElementById('enableMotion').addEventListener('click', requestMotion);
 document.getElementById('skipMotion').addEventListener('click', function(){
   closeGate();
+});
+motionHint.style.pointerEvents = 'auto';
+motionHint.style.cursor = 'pointer';
+motionHint.addEventListener('click', function(){
+  if (!motionOn) requestMotion();
 });
 
 rollBtn.addEventListener('click', roll);
