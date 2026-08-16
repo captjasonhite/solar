@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1215">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<title>60-Minute Full-Body Massage — Guided Session</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- shared SVG defs: patterns, markers, filters -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <pattern id="nozone" width="9" height="9" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+      <rect width="9" height="9" fill="rgba(255,255,255,0.04)"></rect>
+      <line x1="0" y1="0" x2="0" y2="9" stroke="rgba(235,110,110,0.55)" stroke-width="3"></line>
+    </pattern>
+    <marker id="ah-amber" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#e8b878"></path>
+    </marker>
+    <marker id="ah-light" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="rgba(255,255,255,0.85)"></path>
+    </marker>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="4"></feGaussianBlur>
+    </filter>
+  </defs>
+</svg>
+
+<!-- ============ START SCREEN ============ -->
+<main id="screen-start" class="screen">
+  <div class="start-wrap">
+    <div class="start-badge">GUIDED SESSION</div>
+    <h1 class="start-title">60-Minute<br>Full-Body Massage</h1>
+    <p class="start-sub">A guided step-by-step massage session</p>
+
+    <div class="start-silhouette" aria-label="Silhouette of a person lying down">
+      <svg viewBox="0 0 360 120" role="img" aria-hidden="true">
+        <rect x="6" y="66" width="348" height="46" rx="23" fill="rgba(232,184,120,0.10)" stroke="rgba(232,184,120,0.25)"></rect>
+        <circle cx="46" cy="66" r="17" fill="#2c3a42"></circle>
+        <path d="M68,52 h96 a22,22 0 0 1 0,44 H68 a22,22 0 0 1 0,-44 z" fill="#2c3a42"></path>
+        <path d="M168,54 q70,-6 128,2 q26,4 52,10 l-4,14 q-30,-4 -58,-4 q-60,0 -118,6 z" fill="#2c3a42"></path>
+        <path d="M168,80 q60,8 118,4 q30,-2 58,2 l-2,10 q-32,0 -60,-2 q-62,-4 -114,-8 z" fill="#26323a"></path>
+        <circle class="breathe-dot" cx="46" cy="66" r="24" fill="none" stroke="rgba(232,184,120,0.5)" stroke-width="1.5"></circle>
+      </svg>
+    </div>
+
+    <button id="btn-start" class="btn btn-primary btn-start">START MASSAGE</button>
+    <div class="start-splits">30 min prone &nbsp;•&nbsp; 30 min supine</div>
+
+    <div class="start-row">
+      <button id="btn-settings-open" class="btn btn-ghost">SETTINGS</button>
+    </div>
+
+    <p class="safety-notice">
+      For relaxation and general wellness. Use gentle pressure, respect comfort and pain limits,
+      and avoid massage over injuries, open wounds, acute inflammation, suspected blood clots,
+      or other areas where massage may be contraindicated.
+    </p>
+  </div>
+</main>
+
+<!-- ============ SESSION SCREEN ============ -->
+<main id="screen-session" class="screen hidden">
+  <header class="topbar">
+    <div class="tb-left" id="tb-region">PRONE • BACK</div>
+    <div class="tb-timer" id="tb-timer" aria-label="Segment time remaining">00:00</div>
+    <div class="tb-right" id="tb-elapsed">00:00</div>
+  </header>
+  <div class="progress-track" role="progressbar" aria-label="Session progress">
+    <div class="progress-fill" id="progress-fill"></div>
+    <div class="phase-mark phase-mark-1" style="left:50%"></div>
+  </div>
+
+  <section class="diagram-area" id="diagram-area" aria-live="polite">
+    <div class="diagram-svg" id="diagram"></div>
+    <div class="diagram-caption" id="diagram-caption" aria-live="polite"></div>
+  </section>
+
+  <section class="info-card">
+    <div class="info-region" id="info-region">LEFT LEG</div>
+    <h2 class="info-title" id="info-title">Long Effleurage</h2>
+    <p class="info-instr" id="info-instr">Use broad, comfortable strokes…</p>
+    <div class="info-grid">
+      <div class="info-cell"><span class="cell-label">PRESSURE</span><span class="cell-value" id="info-pressure">●●○○○ Gentle</span></div>
+      <div class="info-cell"><span class="cell-label">DIRECTION</span><span class="cell-value" id="info-direction">Toward shoulders</span></div>
+      <div class="info-cell"><span class="cell-label">TIME</span><span class="cell-value" id="info-time">2:00</span></div>
+    </div>
+    <div class="info-next" id="info-next">Next: Right Leg</div>
+    <div class="info-safety hidden" id="info-safety"></div>
+  </section>
+
+  <footer class="controls">
+    <div class="ctrl-row">
+      <button class="btn btn-ctrl" id="btn-prev" aria-label="Previous segment">‹&nbsp;PREV</button>
+      <button class="btn btn-primary btn-pause" id="btn-pause">PAUSE</button>
+      <button class="btn btn-ctrl" id="btn-next" aria-label="Next segment">NEXT&nbsp;›</button>
+    </div>
+    <div class="ctrl-row ctrl-row-sub">
+      <button class="btn btn-sub" id="btn-add30">+30 SEC</button>
+      <button class="btn btn-sub" id="btn-add60">+1 MIN</button>
+      <button class="btn btn-sub" id="btn-restart-seg">RESTART SEGMENT</button>
+      <button class="btn btn-sub" id="btn-settings" aria-label="Settings">⚙</button>
+    </div>
+  </footer>
+
+  <!-- transition overlay (drape / flip) -->
+  <div class="overlay hidden" id="ov-transition">
+    <div class="ov-card">
+      <div class="ov-kicker">TRANSITION</div>
+      <div class="ov-diagram" id="ov-transition-diagram"></div>
+      <p class="ov-text" id="ov-transition-text"></p>
+      <button class="btn btn-primary" id="btn-ready">READY — CONTINUE</button>
+    </div>
+  </div>
+
+  <!-- pause overlay -->
+  <div class="overlay hidden" id="ov-pause">
+    <div class="ov-card">
+      <div class="ov-kicker">PAUSED</div>
+      <div class="ov-big" id="ov-pause-timer">00:00</div>
+      <p class="ov-text">The session is paused. Your progress is kept.</p>
+      <button class="btn btn-primary" id="btn-resume">RESUME</button>
+      <button class="btn btn-ghost" id="btn-home">END SESSION</button>
+    </div>
+  </div>
+
+  <!-- phase intro overlay -->
+  <div class="overlay overlay-phase hidden" id="ov-phase">
+    <div class="ov-card">
+      <div class="ov-kicker" id="ov-phase-kicker">PHASE 1</div>
+      <div class="ov-big-title" id="ov-phase-title">PRONE POSITION</div>
+      <p class="ov-text" id="ov-phase-text">Client lies face down.</p>
+      <div class="ov-hint">Tap to begin</div>
+    </div>
+  </div>
+</main>
+
+<!-- ============ COMPLETE SCREEN ============ -->
+<main id="screen-complete" class="screen hidden">
+  <div class="start-wrap">
+    <div class="complete-ring" aria-hidden="true"><span>✓</span></div>
+    <div class="complete-time">60:00</div>
+    <h1 class="start-title">Massage Complete</h1>
+    <p class="start-sub">The guided session is finished.</p>
+    <p class="complete-note">Allow the client to take their time getting dressed and transitioning upright.</p>
+    <div class="start-row">
+      <button class="btn btn-primary" id="btn-again">START AGAIN</button>
+      <button class="btn btn-ghost" id="btn-return">RETURN HOME</button>
+    </div>
+  </div>
+</main>
+
+<!-- ============ SETTINGS PANEL ============ -->
+<div class="overlay hidden" id="ov-settings">
+  <div class="ov-card settings-card">
+    <div class="ov-kicker">SETTINGS</div>
+    <div class="setting-row"><span>Voice Guide</span><button class="toggle" id="tg-voice" role="switch" aria-checked="false" aria-label="Voice guide">OFF</button></div>
+    <div class="setting-row"><span>Sound</span><button class="toggle" id="tg-sound" role="switch" aria-checked="true" aria-label="Sound">ON</button></div>
+    <div class="setting-row"><span>Haptics</span><button class="toggle" id="tg-haptics" role="switch" aria-checked="true" aria-label="Haptics">ON</button></div>
+    <div class="setting-row"><span>Reduced Motion</span><button class="toggle" id="tg-motion" role="switch" aria-checked="false" aria-label="Reduced motion">OFF</button></div>
+    <div class="setting-row"><span>Keep Screen Awake</span><button class="toggle" id="tg-awake" role="switch" aria-checked="true" aria-label="Keep screen awake">ON</button></div>
+    <p class="safety-notice">
+      This app guides relaxation massage only. It does not diagnose or treat medical conditions.
+      Stop if you feel sharp pain, numbness, tingling, dizziness, or unusual swelling.
+    </p>
+    <div class="start-row">
+      <button class="btn btn-ghost" id="btn-restart-all">RESTART SESSION</button>
+      <button class="btn btn-primary" id="btn-settings-close">DONE</button>
+    </div>
+  </div>
+</div>
+
+<!-- confirmation dialog -->
+<div class="overlay hidden" id="ov-confirm">
+  <div class="ov-card">
+    <div class="ov-kicker" id="confirm-title">Are you sure?</div>
+    <p class="ov-text" id="confirm-text"></p>
+    <div class="start-row">
+      <button class="btn btn-ghost" id="confirm-no">CANCEL</button>
+      <button class="btn btn-primary" id="confirm-yes">CONFIRM</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

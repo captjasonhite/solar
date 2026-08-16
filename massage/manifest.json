@@ -1,0 +1,19 @@
+{
+  "name": "60-Minute Full-Body Massage",
+  "short_name": "Massage Guide",
+  "description": "A guided step-by-step 60-minute full-body massage session.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d1215",
+  "theme_color": "#0d1215",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
