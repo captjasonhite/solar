@@ -977,7 +977,6 @@ function hide(el){ el.classList.add('hidden'); }
 
 $('btn-start').addEventListener('click', startSession);
 $('btn-settings-open').addEventListener('click', openSettings);
-$('btn-settings').addEventListener('click', openSettings);
 $('btn-settings-close').addEventListener('click', closeSettings);
 
 $('btn-pause').addEventListener('click', ()=>{
@@ -1005,13 +1004,6 @@ $('btn-next').addEventListener('click', ()=>{
 $('btn-ready').addEventListener('click', ()=>{
   hide(els.ovTransition);
   gotoSegment(state.segIndex+1);
-});
-$('btn-add30').addEventListener('click', ()=>{ state.remaining += 30000; renderTimers(); vib(10); });
-$('btn-add60').addEventListener('click', ()=>{ state.remaining += 60000; renderTimers(); vib(10); });
-$('btn-restart-seg').addEventListener('click', ()=>{
-  state.remaining = SEGMENTS[state.segIndex].dur * 1000;
-  state.warned30 = false;
-  renderTimers(); vib(10);
 });
 
 els.ovPhase.addEventListener('click', ()=>{
