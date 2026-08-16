@@ -570,8 +570,8 @@ function animate(){
     } else {
       restFrames = 0;
     }
-    var timeout = performance.now() - rollStart > 8000;
-    if (restFrames > 35 || timeout){
+    var timeout = performance.now() - rollStart > 20000;
+    if (restFrames > 45 || timeout){
       b1.velocity.setZero(); b2.velocity.setZero();
       b1.angularVelocity.setZero(); b2.angularVelocity.setZero();
       showResult();
