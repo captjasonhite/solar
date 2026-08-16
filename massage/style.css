@@ -93,8 +93,9 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 }
 .tb-left{font-size:10.5px;letter-spacing:.14em;color:var(--dim);text-align:left;line-height:1.4}
 .tb-timer{
-  font-size:clamp(22px,6.5vw,30px);font-weight:700;font-variant-numeric:tabular-nums;
-  letter-spacing:.02em;line-height:1;
+  font-size:clamp(24px,7vw,34px);font-weight:800;font-variant-numeric:tabular-nums;
+  letter-spacing:.02em;line-height:1;color:var(--accent);
+  text-shadow:0 1px 10px rgba(232,184,120,.25);
 }
 .tb-right{font-size:13px;color:var(--dim);text-align:right;font-variant-numeric:tabular-nums;letter-spacing:.06em}
 .progress-track{
