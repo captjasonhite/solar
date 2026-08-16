@@ -68,12 +68,18 @@
 <main id="screen-session" class="screen hidden">
   <header class="topbar">
     <div class="tb-left" id="tb-region">PRONE • BACK</div>
-    <div class="tb-timer" id="tb-timer" aria-label="Segment time remaining">00:00</div>
+    <div class="tb-timer" id="tb-timer" aria-label="Time left in this part">00:00</div>
     <div class="tb-right" id="tb-elapsed">00:00</div>
   </header>
-  <div class="progress-track" role="progressbar" aria-label="Session progress">
-    <div class="progress-fill" id="progress-fill"></div>
-    <div class="phase-mark phase-mark-1" style="left:50%"></div>
+  <div class="seg-track" role="progressbar" aria-label="Time left in this part">
+    <div class="seg-fill" id="seg-fill"></div>
+  </div>
+  <div class="progress-wrap">
+    <div class="progress-track" role="progressbar" aria-label="Overall session progress">
+      <div class="progress-fill" id="progress-fill"></div>
+      <div class="phase-mark phase-mark-1" style="left:50%"></div>
+    </div>
+    <div class="dots" id="dots" aria-label="Each dot is one part of the massage"></div>
   </div>
 
   <section class="diagram-area" id="diagram-area" aria-live="polite">

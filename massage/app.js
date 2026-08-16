@@ -744,7 +744,8 @@ const $ = id => document.getElementById(id);
 const els = {
   start:$('screen-start'), session:$('screen-session'), complete:$('screen-complete'),
   tbRegion:$('tb-region'), tbTimer:$('tb-timer'), tbElapsed:$('tb-elapsed'),
-  progressFill:$('progress-fill'), diagram:$('diagram'), caption:$('diagram-caption'),
+  progressFill:$('progress-fill'), segFill:$('seg-fill'), dots:$('dots'),
+  diagram:$('diagram'), caption:$('diagram-caption'),
   region:$('info-region'), title:$('info-title'), instr:$('info-instr'),
   pressure:$('info-pressure'), direction:$('info-direction'),
   next:$('info-next'), safety:$('info-safety'),
@@ -831,14 +832,25 @@ function renderSegment(){
   els.diagram.innerHTML = `<div class="anim-fadein">${d.svg}</div>`;
   els.diagram.setAttribute('aria-label', d.aria);
   els.caption.textContent = seg.animLabel || '';
+  renderDots();
   renderTimers();
 }
 
 function renderTimers(){
   els.tbTimer.textContent = fmt(state.remaining);
   els.tbElapsed.textContent = fmt(state.elapsed);
+  const seg = SEGMENTS[state.segIndex];
+  els.segFill.style.width = (seg ? Math.max(0, Math.min(100, state.remaining/(seg.dur*1000)*100)) : 0) + '%';
   els.progressFill.style.width = Math.min(100, state.elapsed/TOTAL_MS*100) + '%';
   if(!els.ovPause.classList.contains('hidden')) els.ovPauseTimer.textContent = fmt(state.remaining);
+}
+function renderDots(){
+  const cur = state.segIndex;
+  const kids = els.dots.children;
+  for(let i=0;i<kids.length;i++){
+    kids[i].classList.toggle('done', i < cur);
+    kids[i].classList.toggle('current', i === cur);
+  }
 }
 
 /* ---------------- navigation ---------------- */
@@ -1038,6 +1050,17 @@ bindToggle('tg-motion','motion', ()=>{ document.body.classList.toggle('reduced-m
 bindToggle('tg-awake','awake', ()=>{ state.running ? acquireWakeLock() : releaseWakeLock(); });
 
 if(settings.motion) document.body.classList.add('reduced-motion');
+
+/* ---------------- build overall-progress dots (one per segment) ---------------- */
+(function buildDots(){
+  const frag = document.createDocumentFragment();
+  for(let i=0;i<SEGMENTS.length;i++){
+    const d = document.createElement('span');
+    d.className = 'dot';
+    frag.appendChild(d);
+  }
+  els.dots.appendChild(frag);
+})();
 
 /* ---------------- service worker (optional, best-effort) ---------------- */
 if('serviceWorker' in navigator){

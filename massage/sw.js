@@ -1,4 +1,4 @@
-const CACHE = 'massage-guide-v4';
+const CACHE = 'massage-guide-v5';
 const ASSETS = [
   './',
   './index.html',
