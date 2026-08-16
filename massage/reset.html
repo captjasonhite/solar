@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Updating…</title>
+<style>
+  html,body{margin:0;height:100%;background:#10141a;color:#e7e3da;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    display:flex;align-items:center;justify-content:center;text-align:center}
+  .box{padding:24px;max-width:320px}
+  h1{font-size:19px;font-weight:600;margin:0 0 10px;letter-spacing:.02em}
+  p{font-size:14px;line-height:1.5;color:#b9b2a4;margin:0}
+  .spin{width:34px;height:34px;border:3px solid #2a2f38;border-top-color:#e8b878;
+    border-radius:50%;margin:0 auto 18px;animation:sp 1s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="spin" aria-hidden="true"></div>
+    <h1>Updating the app…</h1>
+    <p>This removes the old cached copy and loads the latest version. You'll be redirected automatically.</p>
+  </div>
+<script>
+(function(){
+  var redirected = false;
+  function go(){
+    if(redirected) return;
+    redirected = true;
+    location.replace('./index.html');
+  }
+  var swDone = Promise.resolve();
+  if('serviceWorker' in navigator){
+    swDone = navigator.serviceWorker.getRegistrations().then(function(regs){
+      return Promise.all(regs.map(function(r){ return r.unregister(); }));
+    }).catch(function(){});
+  }
+  var cacheDone = ('caches' in window)
+    ? caches.keys().then(function(keys){
+        return Promise.all(keys.map(function(k){ return caches.delete(k); }));
+      }).then(function(){
+        try { localStorage.setItem('swv','4'); } catch(e){}
+      }).catch(function(){})
+    : Promise.resolve();
+  Promise.all([swDone, cacheDone]).then(go);
+  setTimeout(go, 2500); // safety fallback
+})();
+</script>
+</body>
+</html>
