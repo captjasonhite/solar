@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rescue on Fractulus</title>
+<style>
+  :root{
+    --bg:#05070a;
+    --ink:#cfe3dd;
+    --dim:#5f7a74;
+    --amber:#ffb347;
+    --red:#ff5a4d;
+    --panel:rgba(6,10,12,.72);
+    --line:rgba(120,180,170,.25);
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html,body{ height:100%; overflow:hidden; background:var(--bg); }
+  body{
+    font-family:"Courier New", ui-monospace, monospace;
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+    user-select:none;
+    cursor:default;
+  }
+  #wrap{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; }
+  canvas#view{
+    image-rendering:pixelated;
+    image-rendering:crisp-edges;
+    background:#05070a;
+    box-shadow:0 0 0 2px #0a0f12, 0 24px 90px rgba(0,0,0,.7);
+  }
+  .screen{
+    position:fixed; inset:0; z-index:20;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center;
+    background:radial-gradient(120% 90% at 50% 30%, rgba(10,20,22,.72), rgba(3,5,7,.94));
+    backdrop-filter:blur(2px);
+  }
+  .screen.hidden{ display:none; }
+  .title{
+    font-size:clamp(30px,6.4vw,72px);
+    letter-spacing:.14em;
+    font-weight:700;
+    color:#eafff6;
+    text-shadow:0 0 18px rgba(90,220,190,.35), 0 2px 0 #0a1a17;
+  }
+  .title .sub{
+    display:block; font-size:clamp(11px,1.7vw,16px); letter-spacing:.5em;
+    color:var(--dim); margin-top:10px; font-weight:400;
+  }
+  .card{
+    margin-top:26px; padding:18px 26px; max-width:640px;
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    font-size:13px; line-height:1.85; letter-spacing:.03em;
+  }
+  .card h2{
+    font-size:12px; letter-spacing:.34em; color:var(--amber); margin-bottom:10px; font-weight:700;
+  }
+  .keys{ display:grid; grid-template-columns:auto 1fr; gap:4px 18px; text-align:left; margin-top:6px; }
+  .keys kbd{
+    font-family:inherit; background:#0c1417; border:1px solid var(--line); border-bottom-width:2px;
+    border-radius:5px; padding:1px 8px; color:#d7fff2; font-size:12px; white-space:nowrap;
+  }
+  .keys span{ color:var(--dim); }
+  .go{
+    margin-top:26px; font-size:15px; letter-spacing:.28em; color:#eafff6;
+    animation:blink 1.15s steps(2,end) infinite;
+  }
+  @keyframes blink{ 50%{ opacity:.25; } }
+  .big{ font-size:clamp(26px,5vw,54px); letter-spacing:.16em; font-weight:700; }
+  .big.win{ color:#8dffb0; text-shadow:0 0 22px rgba(90,255,160,.4); }
+  .big.lose{ color:var(--red); text-shadow:0 0 22px rgba(255,90,77,.4); }
+  .stat{ margin-top:16px; font-size:14px; letter-spacing:.12em; color:var(--dim); line-height:2; }
+  .stat b{ color:#eafff6; }
+  .foot{ position:fixed; bottom:14px; width:100%; text-align:center; font-size:11px; letter-spacing:.2em; color:#33474a; }
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="view" width="384" height="216"></canvas></div>
+
+<!-- START -->
+<div id="menu" class="screen">
+  <div class="title">RESCUE ON FRACTULUS<span class="sub">H E L I C O P T E R &nbsp; S A R &nbsp; P R O T O T Y P E</span></div>
+  <div class="card">
+    <h2>MISSION BRIEFING</h2>
+    Five survivors are stranded in the mountains of Fractulus. Fly out, find their
+    beacons, land close enough to pull them aboard, and bring them home to base.
+    <b style="color:#eafff6">Refuel at base between runs.</b> Watch your fuel.
+    <span style="color:var(--dim)">Some of the things you find are not what they seem.</span>
+    <div class="keys">
+      <kbd>W / &uarr;</kbd><span>pitch forward &mdash; accelerate</span>
+      <kbd>S / &darr;</kbd><span>pitch back &mdash; brake / reverse</span>
+      <kbd>A / &larr;</kbd><span>turn left</span>
+      <kbd>D / &rarr;</kbd><span>turn right</span>
+      <kbd>SPACE</kbd><span>climb (collective up)</span>
+      <kbd>SHIFT</kbd><span>descend (collective down)</span>
+      <kbd>E</kbd><span>rescue survivor when landed nearby</span>
+      <kbd>M</kbd><span>mute &nbsp;&middot;&nbsp; <kbd style="border:none;background:none">R</kbd> restart</span>
+    </div>
+  </div>
+  <div class="go">CLICK OR PRESS ANY KEY TO FLY</div>
+  <div class="foot">EARLY-80S PROCEDURAL 3D &middot; SOFT-SPRAY TERRAIN &middot; WEB AUDIO</div>
+</div>
+
+<!-- GAME OVER -->
+<div id="over" class="screen hidden">
+  <div class="big lose" id="overTitle">MISSION FAILED</div>
+  <div class="stat" id="overStat"></div>
+  <div class="go">PRESS R TO FLY AGAIN</div>
+</div>
+
+<!-- WIN -->
+<div id="win" class="screen hidden">
+  <div class="big win">MISSION COMPLETE</div>
+  <div class="stat" id="winStat"></div>
+  <div class="go">PRESS R TO FLY AGAIN</div>
+</div>
+
+<script>
+(() => {
+"use strict";
+
+/* ============================================================
+   RESCUE ON FRACTULUS
+   Retro first-person helicopter search & rescue.
+   Software 3D terrain on a low-res canvas, scaled up pixelated.
+   ============================================================ */
+
+const cv  = document.getElementById("view");
+const ctx = cv.getContext("2d");
+const W = cv.width, H = cv.height;           // internal render resolution
+const TAU = Math.PI * 2;
+
+const clamp = (v,a,b)=> v<a?a:(v>b?b:v);
+const lerp  = (a,b,t)=> a+(b-a)*t;
+const rand  = (a,b)=> a+Math.random()*(b-a);
+const randi = (a,b)=> Math.floor(rand(a,b+1));
+const dist2d = (ax,az,bx,bz)=> Math.hypot(ax-bx, az-bz);
+
+/* ---------- fit canvas to window, keep aspect ---------- */
+function fit(){
+  const s = Math.min(window.innerWidth/W, window.innerHeight/H) * 0.985;
+  cv.style.width  = (W*s)+"px";
+  cv.style.height = (H*s)+"px";
+}
+window.addEventListener("resize", fit); fit();
+
+/* ============================================================
+   NOISE  (value noise, multi-octave, deterministic)
+   ============================================================ */
+function hash2(x, y){
+  let n = x*374761393 + y*668265263;
+  n = (n ^ (n >> 13)) * 1274126177;
+  n = (n ^ (n >> 16));
+  return (n >>> 0) / 4294967295;   // 0..1
+}
+function vnoise(x, y){
+  const xi = Math.floor(x), yi = Math.floor(y);
+  const xf = x-xi, yf = y-yi;
+  const u = xf*xf*(3-2*xf), v = yf*yf*(3-2*yf);
+  const a = hash2(xi, yi),     b = hash2(xi+1, yi);
+  const c = hash2(xi, yi+1),   d = hash2(xi+1, yi+1);
+  return lerp(lerp(a,b,u), lerp(c,d,u), v);
+}
+function fbm(x, y, oct){
+  let amp=1, freq=1, sum=0, norm=0;
+  for(let i=0;i<oct;i++){
+    sum  += vnoise(x*freq, y*freq)*amp;
+    norm += amp;
+    amp  *= 0.5; freq *= 2.02;
+  }
+  return sum/norm;   // ~0..1
+}
+
+/* ============================================================
+   TERRAIN
+   World units. X east, Y up, Z north. Base at origin.
+   ============================================================ */
+const CELL = 52;                 // world units per grid cell
+const SEA  = 0;                  // reference ground level
+
+// flat spots: {x, z, r, h}  -> blend terrain toward h within radius r
+const flats = [];
+const BASE = { x:0, z:0, r:260, h:14 };
+
+function addFlat(x, z, r, h){ flats.push({x,z,r,h}); }
+
+function terrainRaw(x, z){
+  // base rolling height, 0..~1
+  let e = fbm(x*0.0016 + 11.3, z*0.0016 - 4.7, 5);
+  // ridged component for sharp mountain crests
+  const r = fbm(x*0.0031 + 3.1, z*0.0031 + 9.2, 4);
+  const ridge = 1 - Math.abs(2*r - 1);
+  let h = e*0.72 + ridge*ridge*0.55;
+  // mountains grow with distance from base -> later survivors in rougher ground
+  const d = Math.hypot(x, z);
+  const grow = 1 + (d/2600)*0.85;
+  return h * 300 * grow;
+}
+function terrainH(x, z){
+  let h = terrainRaw(x, z);
+  // flatten base + survivor pads (smoothstep blend)
+  for(let i=0;i<flats.length;i++){
+    const f = flats[i];
+    const d = Math.hypot(x-f.x, z-f.z);
+    if(d < f.r){
+      const t = 1 - d/f.r;
+      const s = t*t*(3-2*t);
+      h = lerp(h, f.h, s);
+    }
+  }
+  return h;
+}
+// slope (0 flat .. 1 steep) via central differences
+function terrainSlope(x, z){
+  const e = 6;
+  const hL = terrainH(x-e,z), hR = terrainH(x+e,z);
+  const hD = terrainH(x,z-e), hU = terrainH(x,z+e);
+  const gx = (hR-hL)/(2*e), gz = (hU-hD)/(2*e);
+  return clamp(Math.hypot(gx,gz) / 1.0, 0, 1);
+}
+
+/* ============================================================
+   PALETTE  (retro, limited, alien Fractulus)
+   ============================================================ */
+const FOG = [126,158,156];        // haze == horizon, mountains fade into sky
+const SKY_TOP = [18,28,44];
+const SKY_HOR = [120,150,150];
+function terrainColor(h, slope){
+  // bands by altitude
+  let c;
+  if(h < 40)       c = [52, 78, 62];   // valley veg (teal-green)
+  else if(h < 95)  c = [78, 98, 58];   // olive
+  else if(h < 165) c = [122,104, 66];  // tan scree
+  else if(h < 250) c = [112,106,100];  // grey rock
+  else             c = [176,172,166];  // pale peaks
+  // steep slopes read as darker rock
+  if(slope > 0.55){
+    const m = clamp((slope-0.55)/0.45, 0, 1);
+    c = [ lerp(c[0],86,m), lerp(c[1],82,m), lerp(c[2],78,m) ];
+  }
+  return c;
+}
+function rgb(c){ return "rgb("+(c[0]|0)+","+(c[1]|0)+","+(c[2]|0)+")"; }
+
+/* ============================================================
+   AUDIO  (Web Audio, all synthesized)
+   ============================================================ */
+let AC=null, master=null, muted=false;
+let engOsc=null, engGain=null, engLfo=null, engLfoG=null;
+let rotNoise=null, rotGain=null, rotLfo=null, rotLfoG=null, rotBP=null;
+let windNoise=null, windGain=null, windBP=null;
+
+function initAudio(){
+  if(AC) return;
+  try{
+    AC = new (window.AudioContext || window.webkitAudioContext)();
+    master = AC.createGain(); master.gain.value = muted?0:1; master.connect(AC.destination);
+
+    // --- engine: low saw + slow throb LFO ---
+    engOsc = AC.createOscillator(); engOsc.type="sawtooth"; engOsc.frequency.value=54;
+    engGain = AC.createGain(); engGain.gain.value=0;
+    const engLP = AC.createBiquadFilter(); engLP.type="lowpass"; engLP.frequency.value=420;
+    engLfo = AC.createOscillator(); engLfo.type="sine"; engLfo.frequency.value=11;
+    engLfoG = AC.createGain(); engLfoG.gain.value=0.5;
+    engLfo.connect(engLfoG); engLfoG.connect(engGain.gain);
+    engOsc.connect(engLP); engLP.connect(engGain); engGain.connect(master);
+    engOsc.start(); engLfo.start();
+
+    // --- rotor: band-passed noise, amplitude "chop" LFO ---
+    rotNoise = makeNoise();
+    rotBP = AC.createBiquadFilter(); rotBP.type="bandpass"; rotBP.frequency.value=240; rotBP.Q.value=0.8;
+    rotGain = AC.createGain(); rotGain.gain.value=0;
+    rotLfo = AC.createOscillator(); rotLfo.type="square"; rotLfo.frequency.value=13;
+    rotLfoG = AC.createGain(); rotLfoG.gain.value=0.5;
+    rotLfo.connect(rotLfoG); rotLfoG.connect(rotGain.gain);
+    rotNoise.connect(rotBP); rotBP.connect(rotGain); rotGain.connect(master);
+    rotLfo.start();
+
+    // --- wind: filtered noise ---
+    windNoise = makeNoise();
+    windBP = AC.createBiquadFilter(); windBP.type="bandpass"; windBP.frequency.value=600; windBP.Q.value=0.5;
+    windGain = AC.createGain(); windGain.gain.value=0;
+    windNoise.connect(windBP); windBP.connect(windGain); windGain.connect(master);
+  }catch(e){ AC=null; }
+}
+function makeNoise(){
+  const len = AC.sampleRate * 1.2;
+  const buf = AC.createBuffer(1, len, AC.sampleRate);
+  const d = buf.getChannelData(0);
+  for(let i=0;i<len;i++) d[i] = Math.random()*2-1;
+  const src = AC.createBufferSource(); src.buffer=buf; src.loop=true; src.start();
+  return src;
+}
+function setEngine(collective, speed){
+  if(!AC) return;
+  const t = AC.currentTime;
+  const load = clamp(collective*0.6 + speed*0.4, 0, 1.3);
+  engOsc.frequency.setTargetAtTime(48 + load*70, t, 0.08);
+  engGain.gain.setTargetAtTime(0.10 + load*0.10, t, 0.1);
+  engLfo.frequency.setTargetAtTime(9 + load*8, t, 0.1);
+  rotLfo.frequency.setTargetAtTime(11 + load*7, t, 0.1);
+  rotGain.gain.setTargetAtTime(0.05 + load*0.05, t, 0.1);
+}
+function setWind(speed){
+  if(!AC) return;
+  const t = AC.currentTime;
+  windGain.gain.setTargetAtTime(clamp(speed,0,1)*0.16, t, 0.2);
+  windBP.frequency.setTargetAtTime(400 + speed*900, t, 0.2);
+}
+function toggleMute(){ muted=!muted; if(master) master.gain.value = muted?0:1; }
+function beep(f0,f1,dur,type,vol,delay=0){
+  if(!AC) return;
+  const t = AC.currentTime + delay;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type=type; o.frequency.setValueAtTime(f0,t);
+  o.frequency.exponentialRampToValueAtTime(Math.max(f1,1), t+dur);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(vol, t+0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t+dur+0.02);
+}
+function noiseBurst(dur, freq, vol, delay=0){
+  if(!AC) return;
+  const t = AC.currentTime + delay;
+  const len = Math.max(1, (AC.sampleRate*dur)|0);
+  const buf = AC.createBuffer(1, len, AC.sampleRate);
+  const d = buf.getChannelData(0);
+  for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*(1-i/len);
+  const s = AC.createBufferSource(); s.buffer=buf;
+  const f = AC.createBiquadFilter(); f.type="bandpass"; f.frequency.value=freq; f.Q.value=1.2;
+  const g = AC.createGain(); g.gain.value=vol;
+  s.connect(f); f.connect(g); g.connect(master); s.start(t);
+}
+const sfx = {
+  radio(){ noiseBurst(0.18, 1400, 0.10); beep(880, 880, 0.05, "square", 0.05, 0.02); },
+  lock(){ beep(660,660,0.06,"square",0.07); beep(990,990,0.09,"square",0.07,0.08); },
+  land(){ beep(520,520,0.09,"triangle",0.12); beep(780,780,0.14,"triangle",0.12,0.1); },
+  rescue(){ beep(520,520,0.08,"triangle",0.12); beep(660,660,0.08,"triangle",0.12,0.09); beep(880,880,0.16,"triangle",0.12,0.18); },
+  warn(){ beep(300,300,0.12,"square",0.10); },
+  hostile(){
+    // dramatic sting: dissonant cluster + descending alarm + low growl
+    if(!AC) return;
+    beep(180, 60, 0.9, "sawtooth", 0.22);
+    beep(186, 66, 0.9, "sawtooth", 0.20, 0.01);
+    beep(640,120, 0.7, "square", 0.16, 0.05);
+    noiseBurst(0.5, 300, 0.20, 0.02);
+  },
+  escape(){ beep(440,440,0.08,"triangle",0.1); beep(660,660,0.12,"triangle",0.1,0.09); },
+  crash(){ noiseBurst(0.9, 200, 0.3); beep(120,40,0.8,"sawtooth",0.22); },
+  refuel(){ beep(300,600,0.25,"sine",0.08); }
+};
+
+/* ============================================================
+   GAME STATE
+   ============================================================ */
+const TARGET = 5;                 // survivors to rescue to win
+const FUEL_MAX = 100;
+const RESCUE_RADIUS = 78;         // land within this of a survivor to rescue
+const SIGNAL_RANGE = 1500;        // radio bearing range
+const BASE_REFUEL_R = 200;        // refuel when grounded within this of base
+
+let state = "menu";               // menu | play | over | win
+let heli, survivors, rescues, passenger, fuel, time, seed;
+let sub = "fly";                  // fly | rescue | board | hostile | escape
+let subT = 0;                     // sub-state timer
+let hostileTimer = 0;
+let escapeTarget = null;
+let overReason = "";
+let radioLocked = false;
+let warnT = 0;
+let frameMs = 16;
+let renderR = 30;                 // adaptive render radius (in cells)
+
+// helicopter
+function makeHeli(){
+  return {
+    x:BASE.x, y:BASE.h, z:BASE.z,
+    vx:0, vy:0, vz:0,
+    yaw:0, pitch:0, roll:0,
+    speed:0,                      // horizontal speed (units/s)
+    grounded:true
+  };
+}
+
+/* ---------- survivor generation ---------- */
+function genSurvivors(){
+  survivors = [];
+  // clear flats except base
+  flats.length = 0; addFlat(BASE.x, BASE.z, BASE.r, BASE.h);
+
+  const N = 8;                    // pool; need TARGET safe
+  const placed = [];
+  for(let i=0;i<N;i++){
+    let x=0, z=0, ok=false, tries=0;
+    const minD = 520 + i*360;     // farther each survivor
+    const maxD = minD + 520;
+    while(!ok && tries<40){
+      const ang = rand(0,TAU);
+      const d   = rand(minD, maxD);
+      x = Math.cos(ang)*d; z = Math.sin(ang)*d;
+      ok = true;
+      if(dist2d(x,z,0,0) < minD-40) ok=false;
+      for(const p of placed){ if(dist2d(x,z,p.x,p.z) < 460){ ok=false; break; } }
+      tries++;
+    }
+    const h = terrainH(x,z);
+    // flatten a small landing pad; later survivors get smaller/less flat pads
+    const padR = Math.max(46, 92 - i*9);
+    addFlat(x, z, padR, h);
+    placed.push({x,z});
+    survivors.push({
+      x, z, h,
+      state:"stranded",           // stranded | aboard | rescued | hostile | escaped
+      hostile:false,
+      padR,
+      wave:rand(0,TAU)
+    });
+  }
+  // assign hostility, increasing with index; guarantee >= TARGET safe
+  for(let i=0;i<N;i++){
+    const base = [0,0,0.18,0.34,0.5,0.62,0.74,0.84][i];
+    survivors[i].hostile = Math.random() < base;
+  }
+  let safe = survivors.filter(s=>!s.hostile).length;
+  // if not enough safe, flip some (prefer later / farthest) to safe
+  if(safe < TARGET){
+    const idxs = survivors.map((s,i)=>i).sort((a,b)=>
+      (survivors[b].hostile-survivors[a].hostile) || (Math.hypot(survivors[b].x,survivors[b].z)-Math.hypot(survivors[a].x,survivors[a].z)));
+    for(const i of idxs){
+      if(safe>=TARGET) break;
+      if(survivors[i].hostile){ survivors[i].hostile=false; safe++; }
+    }
+  }
+}
+
+function newMission(){
+  seed = Math.random()*10000|0;
+  genSurvivors();
+  heli = makeHeli();
+  rescues = 0; passenger = false; fuel = FUEL_MAX;
+  time = 0; sub="fly"; subT=0; hostileTimer=0; escapeTarget=null;
+  radioLocked=false; warnT=0;
+  state = "play";
+  showScreen(null);
+}
+
+/* ---------- screen helpers ---------- */
+const menuEl = document.getElementById("menu");
+const overEl = document.getElementById("over");
+const winEl  = document.getElementById("win");
+function showScreen(name){
+  menuEl.classList.toggle("hidden", name!=="menu");
+  overEl.classList.toggle("hidden", name!=="over");
+  winEl .classList.toggle("hidden", name!=="win");
+}
+
+/* ============================================================
+   INPUT
+   ============================================================ */
+const keys = {};
+window.addEventListener("keydown", e=>{
+  if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key)) e.preventDefault();
+  keys[e.key.toLowerCase()] = true;
+  keys[e.key] = true;
+  if(state==="menu"){ startGame(); return; }
+  if(e.key.toLowerCase()==="m") toggleMute();
+  if(e.key.toLowerCase()==="r" && (state==="over"||state==="win")) newMission();
+  if(e.key.toLowerCase()==="e") tryRescue();
+});
+window.addEventListener("keyup", e=>{
+  keys[e.key.toLowerCase()] = false;
+  keys[e.key] = false;
+});
+cv.addEventListener("mousedown", ()=>{ if(state==="menu") startGame(); });
+menuEl.addEventListener("mousedown", ()=>{ if(state==="menu") startGame(); });
+function startGame(){ initAudio(); if(AC&&AC.state==="suspended") AC.resume(); newMission(); }
+
+/* ============================================================
+   FLIGHT MODEL  (arcade)
+   ============================================================ */
+const MAX_SPEED = 220;      // units/s
+const ACCEL     = 150;
+const TURN_RATE = 1.15;     // rad/s
+const CLIMB_MAX = 95;       // units/s vertical
+const ROLL_MAX  = 0.5;
+
+function input(){
+  const up    = keys["w"]||keys["ArrowUp"];
+  const down  = keys["s"]||keys["ArrowDown"];
+  const left  = keys["a"]||keys["ArrowLeft"];
+  const right = keys["d"]||keys["ArrowRight"];
+  const climb = keys[" "];
+  const desc  = keys["shift"]||keys["Shift"];
+  return {
+    pitch: (up?1:0)-(down?1:0),
+    turn : (right?1:0)-(left?1:0),
+    coll : (climb?1:0)-(desc?1:0)
+  };
+}
+
+function updateFlight(dt){
+  const h = heli;
+  const inp = input();
+
+  // --- turning (rudder) ---
+  h.yaw += inp.turn * TURN_RATE * dt;
+  // bank roll follows turn
+  const rollT = inp.turn * ROLL_MAX;
+  h.roll = lerp(h.roll, rollT, 1-Math.pow(0.001, dt));
+
+  // --- pitch: forward/back speed (nose down to accelerate) ---
+  const speedT = inp.pitch * MAX_SPEED * 0.62;
+  // relax to target with drag
+  h.speed = lerp(h.speed, speedT, 1-Math.pow(0.25, dt));
+  // view pitch follows speed (nose dips when moving forward)
+  const pitchT = -h.speed*0.0016;
+  h.pitch = lerp(h.pitch, pitchT, 1-Math.pow(0.2, dt));
+
+  // --- vertical (collective) ---
+  let vyT = inp.coll * CLIMB_MAX;
+  // slight gravity sink when collective neutral & airborne (weight)
+  if(!h.grounded && inp.coll===0) vyT = -14;
+
+  // --- integrate horizontal along heading ---
+  const fx = Math.sin(h.yaw), fz = Math.cos(h.yaw);
+  h.vx = fx * h.speed;
+  h.vz = fz * h.speed;
+  h.x += h.vx*dt;
+  h.z += h.vz*dt;
+
+  // --- vertical integrate ---
+  h.vy = lerp(h.vy, vyT, 1-Math.pow(0.15, dt));
+  h.y += h.vy*dt;
+
+  // --- world bounds (soft) ---
+  const BOUND = 4200;
+  h.x = clamp(h.x, -BOUND, BOUND);
+  h.z = clamp(h.z, -BOUND, BOUND);
+
+  // --- terrain collision / landing / takeoff ---
+  const ground = terrainH(h.x, h.z);
+  const slope  = terrainSlope(h.x, h.z);
+  const AGL = h.y - ground;
+  const hs  = Math.hypot(h.vx, h.vz);
+  const wasGrounded = h.grounded;
+  const wantLift = inp.coll > 0;
+
+  if(AGL <= 0.5){
+    if(wantLift){
+      // taking off / holding on the pad: allow rise, don't snap back down
+      if(h.y < ground) h.y = ground;
+      if(h.y - ground > 2) h.grounded = false;
+    }else{
+      // only a fresh, fast, steep arrival is a fatal impact
+      const hardImpact = !wasGrounded && (h.vy < -72 || hs > 58 || slope > 0.55);
+      if(hardImpact) return crash("terrain impact");
+      // landing / taxi / rest on the surface
+      h.y = ground; h.vy = 0;
+      if(!h.grounded){ h.grounded = true; sfx.land(); }
+      h.speed = lerp(h.speed, inp.pitch*70, 1-Math.pow(0.2,dt));
+    }
+  }else{
+    h.grounded = false;
+  }
+
+  // --- fuel ---
+  const load = clamp(Math.abs(inp.coll)*0.7 + hs/MAX_SPEED*0.6, 0, 1.4);
+  fuel -= (2.0 + load*4.5) * dt;
+  // refuel at base when grounded
+  const atBase = dist2d(h.x,h.z,BASE.x,BASE.z) < BASE_REFUEL_R && h.grounded;
+  if(atBase && fuel < FUEL_MAX){
+    fuel = Math.min(FUEL_MAX, fuel + 40*dt);
+    if((time*2|0)%2===0 && Math.random()<0.3) sfx.refuel();
+  }
+  if(fuel <= 0){
+    fuel = 0;
+    if(!atBase) return crash("fuel exhausted");
+  }
+
+  // --- warnings ---
+  warnT -= dt;
+  if(fuel < 22 && warnT<=0){ sfx.warn(); warnT=1.1; }
+  if(AGL < 22 && !h.grounded && hs>30 && warnT<=0){ sfx.warn(); warnT=0.7; }
+
+  // --- audio ---
+  setEngine(clamp(Math.abs(inp.coll)+hs/MAX_SPEED,0,1.3), hs/MAX_SPEED);
+  setWind(hs/MAX_SPEED);
+}
+
+function crash(reason){
+  sfx.crash();
+  overReason = reason;
+  state = "over";
+  document.getElementById("overTitle").textContent = "MISSION FAILED";
+  document.getElementById("overStat").innerHTML =
+    "CAUSE: <b>"+reason.toUpperCase()+"</b><br>"+
+    "SURVIVORS RESCUED: <b>"+rescues+" / "+TARGET+"</b>";
+  showScreen("over");
+  setEngine(0,0); setWind(0);
+}
+
+function winGame(){
+  state = "win";
+  document.getElementById("winStat").innerHTML =
+    "ALL <b>"+TARGET+"</b> SURVIVORS BROUGHT HOME<br>"+
+    "FUEL REMAINING: <b>"+Math.round(fuel)+"</b>";
+  showScreen("win");
+  sfx.rescue();
+  setEngine(0,0); setWind(0);
+}
+
+/* ============================================================
+   RESCUE + HOSTILE LOGIC
+   ============================================================ */
+function nearestSurvivor(){
+  let best=null, bd=1e9;
+  for(const s of survivors){
+    if(s.state!=="stranded") continue;
+    const d = dist2d(heli.x,heli.z,s.x,s.z);
+    if(d<bd){ bd=d; best=s; }
+  }
+  return {s:best, d:bd};
+}
+function canRescue(){
+  const {s,d} = nearestSurvivor();
+  const h = heli;
+  return s && d < RESCUE_RADIUS && (h.grounded || (h.y - terrainH(h.x,h.z) < 8)) && Math.hypot(h.vx,h.vz) < 55;
+}
+function tryRescue(){
+  if(state!=="play" || sub!=="fly") return;
+  if(!canRescue()) return;
+  const {s} = nearestSurvivor();
+  if(s.hostile){
+    // ---- reveal: it is NOT human ----
+    s.state = "hostile";
+    sub = "hostile"; subT = 0;
+    hostileTimer = 7.5;
+    escapeTarget = s;
+    sfx.hostile();
+  }else{
+    // ---- genuine rescue: board ----
+    s.state = "aboard";
+    sub = "board"; subT = 0;
+    passenger = true;
+    sfx.rescue();
+  }
+}
+
+function updateSub(dt){
+  if(sub==="board"){
+    subT += dt;
+    if(subT > 1.4){
+      // boarded; must return to base
+      sub = "fly"; subT = 0;
+    }
+    return;
+  }
+  if(sub==="hostile"){
+    subT += dt;
+    hostileTimer -= dt;
+    const s = escapeTarget;
+    const d = dist2d(heli.x,heli.z,s.x,s.z);
+    const airborne = !heli.grounded && (heli.y - terrainH(heli.x,heli.z) > 6);
+    if(airborne && d > 150){
+      // escaped
+      s.state = "escaped";
+      sub = "fly"; subT = 0; escapeTarget = null;
+      sfx.escape();
+    }else if(hostileTimer <= 0){
+      crash("consumed by the thing");
+    }
+    // keep engine hot while fleeing
+    setEngine(1.2, heli.speed/MAX_SPEED);
+    return;
+  }
+}
+
+function checkBaseReturn(){
+  // passenger delivered -> credit the rescue
+  if(passenger && sub==="fly"){
+    const h = heli;
+    if(h.grounded && dist2d(h.x,h.z,BASE.x,BASE.z) < BASE_REFUEL_R){
+      rescues++;
+      passenger = false;
+      sfx.land();
+      if(rescues >= TARGET){ winGame(); }
+    }
+  }
+}
+
+/* ============================================================
+   CAMERA + PROJECTION
+   ============================================================ */
+const FOV = 70 * Math.PI/180;
+const FOCAL = (H/2) / Math.tan(FOV/2);
+const NEAR = 0.6;
+
+// project a world point -> {sx, sy, z} or null
+function project(px, py, pz){
+  const h = heli;
+  const dx = px - h.x, dy = py - h.y, dz = pz - h.z;
+  const fx = Math.sin(h.yaw), fz = Math.cos(h.yaw);
+  const rx = Math.cos(h.yaw), rz = -Math.sin(h.yaw);
+  let zc = dx*fx + dz*fz;
+  let xc = dx*rx + dz*rz;
+  let yc = dy;
+  // pitch
+  const cp = Math.cos(h.pitch), sp = Math.sin(h.pitch);
+  let y1 = yc*cp - zc*sp;
+  let z1 = yc*sp + zc*cp;
+  // roll
+  const cr = Math.cos(h.roll), sr = Math.sin(h.roll);
+  let x2 = xc*cr + y1*sr;
+  let y2 = -xc*sr + y1*cr;
+  if(z1 <= NEAR) return null;
+  return {
+    sx: W/2 + x2*FOCAL/z1,
+    sy: H/2 - y2*FOCAL/z1,
+    z : z1
+  };
+}
+
+/* ============================================================
+   RENDER: SKY
+   ============================================================ */
+function drawSky(){
+  // vertical gradient
+  const g = ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0, rgb(SKY_TOP));
+  g.addColorStop(0.62, rgb(SKY_HOR));
+  g.addColorStop(1, rgb(FOG));
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,W,H);
+  // sun disc, fixed in sky (parallax by yaw/pitch)
+  const sunYaw = 2.1, sunPitch = 0.35;
+  // rotate sun dir into camera space
+  const dx = Math.sin(sunYaw), dz = Math.cos(sunYaw), dy = Math.tan(sunPitch);
+  const fx = Math.sin(heli.yaw), fz = Math.cos(heli.yaw);
+  const rx = Math.cos(heli.yaw), rz = -Math.sin(heli.yaw);
+  let zc = dx*fx + dz*fz, xc = dx*rx + dz*rz, yc = dy;
+  const cp = Math.cos(heli.pitch), sp = Math.sin(heli.pitch);
+  let y1 = yc*cp - zc*sp, z1 = yc*sp + zc*cp;
+  const cr = Math.cos(heli.roll), sr = Math.sin(heli.roll);
+  let x2 = xc*cr + y1*sr, y2 = -xc*sr + y1*cr;
+  if(z1>0){
+    const sx = W/2 + x2*FOCAL/z1, sy = H/2 - y2*FOCAL/z1;
+    if(sx>-40 && sx<W+40 && sy>-40 && sy<H+40){
+      const rg = ctx.createRadialGradient(sx,sy,2, sx,sy,42);
+      rg.addColorStop(0,"rgba(255,244,214,0.95)");
+      rg.addColorStop(0.25,"rgba(255,224,170,0.5)");
+      rg.addColorStop(1,"rgba(255,224,170,0)");
+      ctx.fillStyle = rg;
+      ctx.fillRect(sx-44,sy-44,88,88);
+    }
+  }
+}
+
+/* ============================================================
+   RENDER: TERRAIN  (quad mesh, painter's, fog, flat shade)
+   ============================================================ */
+const LIGHT = norm3(-0.42, 0.86, -0.28);
+function norm3(x,y,z){ const l=Math.hypot(x,y,z); return [x/l,y/l,z/l]; }
+
+function drawTerrain(){
+  const h = heli;
+  // grid window in world-space cell indices, centered on camera cell
+  const cxi = Math.round(h.x/CELL), czi = Math.round(h.z/CELL);
+  const R = renderR;
+  const x0 = cxi-R, x1 = cxi+R, z0 = czi-R, z1 = czi+R;
+
+  // compute projected vertices
+  const cols = (x1-x0+1), rows = (z1-z0+1);
+  const vx = new Float32Array(cols*rows), vy = new Float32Array(cols*rows), vz = new Float32Array(cols*rows);
+  const vh = new Float32Array(cols*rows);
+  const valid = new Uint8Array(cols*rows);
+  for(let j=0;j<rows;j++){
+    const wz = (z0+j)*CELL;
+    for(let i=0;i<cols;i++){
+      const wx = (x0+i)*CELL;
+      const id = j*cols+i;
+      const wh = terrainH(wx, wz);
+      vh[id] = wh;
+      const p = project(wx, wh, wz);
+      if(p){ vx[id]=p.sx; vy[id]=p.sy; vz[id]=p.z; valid[id]=1; }
+      else { valid[id]=0; }
+    }
+  }
+
+  // build quads with culling
+  const quads = [];
+  const M = 24; // screen margin
+  for(let j=0;j<rows-1;j++){
+    for(let i=0;i<cols-1;i++){
+      const a=j*cols+i, b=a+1, c=a+cols+1, d=a+cols;
+      if(!valid[a]||!valid[b]||!valid[c]||!valid[d]) continue;
+      // screen-space cull: all four corners off one side
+      const sx=[vx[a],vx[b],vx[c],vx[d]], sy=[vy[a],vy[b],vy[c],vy[d]];
+      let minx=1e9,maxx=-1e9,miny=1e9,maxy=-1e9;
+      for(let k=0;k<4;k++){
+        if(sx[k]<minx)minx=sx[k]; if(sx[k]>maxx)maxx=sx[k];
+        if(sy[k]<miny)miny=sy[k]; if(sy[k]>maxy)maxy=sy[k];
+      }
+      if(maxx < -M || minx > W+M || maxy < -M || miny > H+M) continue;
+      // depth
+      const depth = (vz[a]+vz[b]+vz[c]+vz[d])*0.25;
+      // world height + slope from corner vertices (no extra noise evals)
+      const wh = (vh[a]+vh[b]+vh[c]+vh[d])*0.25;
+      const s = clamp(Math.hypot((vh[b]-vh[a])/CELL, (vh[d]-vh[a])/CELL), 0, 1);
+      quads.push({a,b,c,d, depth, wh, s});
+    }
+  }
+  // sort back -> front
+  quads.sort((p,q)=> q.depth - p.depth);
+
+  // light + fog
+  const fogStart = 900, fogEnd = (R*CELL)*0.92;
+  for(const q of quads){
+    const s = q.s;
+    const base = terrainColor(q.wh, s);
+    const shade = 0.52 + 0.5*(1-s*0.7);   // steeper = darker
+    let r = base[0]*shade, g = base[1]*shade, b = base[2]*shade;
+    // fog blend
+    let t = clamp((q.depth - fogStart)/(fogEnd - fogStart), 0, 1);
+    t = t*t*(3-2*t);
+    r = lerp(r, FOG[0], t); g = lerp(g, FOG[1], t); b = lerp(b, FOG[2], t);
+    ctx.fillStyle = "rgb("+(r|0)+","+(g|0)+","+(b|0)+")";
+    ctx.beginPath();
+    ctx.moveTo(vx[q.a], vy[q.a]);
+    ctx.lineTo(vx[q.b], vy[q.b]);
+    ctx.lineTo(vx[q.c], vy[q.c]);
+    ctx.lineTo(vx[q.d], vy[q.d]);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+/* ============================================================
+   RENDER: BASE HELIPAD
+   ============================================================ */
+function drawBase(){
+  const p = project(BASE.x, BASE.h, BASE.z);
+  if(!p) return;
+  const scale = FOCAL/p.z;
+  const r = 90*scale;
+  if(r < 1 || p.sx<-r || p.sx>W+r || p.sy<-r || p.sy>H+r) return;
+  // pad
+  ctx.save();
+  ctx.translate(p.sx, p.sy);
+  ctx.fillStyle = "rgba(30,34,38,0.92)";
+  ctx.beginPath(); ctx.ellipse(0,0, r, r*0.5, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = "rgba(255,190,80,0.9)"; ctx.lineWidth = Math.max(1, r*0.05);
+  ctx.beginPath(); ctx.ellipse(0,0, r*0.82, r*0.41, 0, 0, TAU); ctx.stroke();
+  // H marker
+  ctx.fillStyle = "rgba(255,220,140,0.95)";
+  const hs = r*0.5;
+  ctx.fillRect(-hs*0.5, -hs*0.5, hs*0.16, hs);
+  ctx.fillRect( hs*0.34, -hs*0.5, hs*0.16, hs);
+  ctx.fillRect(-hs*0.5, -hs*0.05, hs, hs*0.16);
+  ctx.restore();
+}
+
+/* ============================================================
+   RENDER: SURVIVORS
+   ============================================================ */
+function drawSurvivors(){
+  // sort far -> near so near figures draw on top
+  const list = [];
+  for(const s of survivors){
+    if(s.state==="aboard"||s.state==="rescued") continue;
+    const p = project(s.x, s.h, s.z);
+    if(!p) continue;
+    list.push({s, p});
+  }
+  list.sort((a,b)=> b.p.z - a.p.z);
+  for(const {s,p} of list){
+    const scale = FOCAL/p.z;
+    const u = scale; // world->screen
+    // beacon visible from far
+    const beaconOn = (time*2.2|0)%2===0;
+    const bx = p.sx, by = p.sy - 26*u;
+    if(beaconOn && p.z < 2600){
+      const br = Math.max(1.2, 3.2*u);
+      const col = s.state==="hostile" ? "255,70,60" : "255,180,70";
+      const rg = ctx.createRadialGradient(bx,by,0.5, bx,by, br*4);
+      rg.addColorStop(0,"rgba("+col+",0.95)");
+      rg.addColorStop(1,"rgba("+col+",0)");
+      ctx.fillStyle = rg;
+      ctx.fillRect(bx-br*4, by-br*4, br*8, br*8);
+      ctx.fillStyle = "rgb("+col+")";
+      ctx.beginPath(); ctx.arc(bx,by,br,0,TAU); ctx.fill();
+    }
+    // figure (only when close enough to resolve)
+    if(p.z < 520){
+      drawFigure(s, p.sx, p.sy, u);
+    }
+  }
+}
+function drawFigure(s, x, y, u){
+  const hostile = s.state==="hostile";
+  const t = time*6 + s.wave;
+  ctx.save();
+  ctx.translate(x, y);
+  const sgn = hostile?1.7:1;
+  const Ht = 20*u*sgn;         // figure height in px
+  const w = 4.5*u*sgn;
+  // legs
+  ctx.fillStyle = hostile ? "rgb(40,20,26)" : "rgb(28,34,40)";
+  ctx.fillRect(-w*0.5, -Ht*0.42, w*0.4, Ht*0.42);
+  ctx.fillRect( w*0.1, -Ht*0.42, w*0.4, Ht*0.42);
+  // body
+  ctx.fillStyle = hostile ? "rgb(70,26,34)" : "rgb(150,60,50)";
+  ctx.fillRect(-w*0.6, -Ht*0.78, w*1.2, Ht*0.4);
+  // head
+  ctx.fillStyle = hostile ? "rgb(210,60,50)" : "rgb(210,180,150)";
+  ctx.beginPath(); ctx.arc(0, -Ht*0.9, w*0.55, 0, TAU); ctx.fill();
+  // arms (waving)
+  ctx.strokeStyle = hostile ? "rgb(70,26,34)" : "rgb(150,60,50)";
+  ctx.lineWidth = Math.max(1, w*0.42);
+  const wave = Math.sin(t)*0.7;
+  ctx.beginPath();
+  ctx.moveTo(-w*0.55, -Ht*0.7); ctx.lineTo(-w*0.55 - w*0.8, -Ht*0.7 - Ht*0.28 - wave*Ht*0.2);
+  ctx.moveTo( w*0.55, -Ht*0.7); ctx.lineTo( w*0.55 + w*0.8, -Ht*0.7 - Ht*0.28 + wave*Ht*0.2);
+  ctx.stroke();
+  // hostile aura + eyes
+  if(hostile){
+    const rg = ctx.createRadialGradient(0,-Ht*0.6,1, 0,-Ht*0.6, Ht*1.4);
+    rg.addColorStop(0,"rgba(255,40,40,0.5)");
+    rg.addColorStop(1,"rgba(255,40,40,0)");
+    ctx.fillStyle = rg;
+    ctx.fillRect(-Ht*1.4,-Ht*2, Ht*2.8, Ht*2.8);
+    ctx.fillStyle = "rgb(255,240,120)";
+    ctx.fillRect(-w*0.35, -Ht*0.95, w*0.22, w*0.22);
+    ctx.fillRect( w*0.13, -Ht*0.95, w*0.22, w*0.22);
+  }
+  ctx.restore();
+}
+
+/* ============================================================
+   RENDER: COCKPIT + INSTRUMENTS
+   ============================================================ */
+function drawCockpit(){
+  const h = heli;
+  // --- glass tint / vignette ---
+  const vg = ctx.createRadialGradient(W/2,H*0.45,H*0.3, W/2,H*0.5,H*0.85);
+  vg.addColorStop(0,"rgba(0,0,0,0)");
+  vg.addColorStop(1,"rgba(0,0,0,0.5)");
+  ctx.fillStyle = vg; ctx.fillRect(0,0,W,H);
+
+  // --- canopy pillars ---
+  ctx.fillStyle = "#0a0d10";
+  ctx.fillRect(0,0,10,H);                 // left pillar
+  ctx.fillRect(W-10,0,10,H);              // right pillar
+  ctx.fillRect(0,0,W,7);                  // top frame
+  // center post
+  ctx.fillStyle = "rgba(10,13,16,0.9)";
+  ctx.fillRect(W/2-2, 0, 4, H*0.5);
+
+  // --- dashboard ---
+  const db = H*0.72;
+  ctx.fillStyle = "#0b0f12";
+  ctx.beginPath();
+  ctx.moveTo(0,H); ctx.lineTo(0,db+14);
+  ctx.quadraticCurveTo(W/2, db-14, W, db+14);
+  ctx.lineTo(W,H); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = "rgba(120,180,170,0.3)"; ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.moveTo(0,db+14); ctx.quadraticCurveTo(W/2, db-14, W, db+14); ctx.stroke();
+
+  // --- instruments ---
+  const AGL = h.y - terrainH(h.x,h.z);
+  const spd = Math.hypot(h.vx,h.vz);
+  const hdg = ((h.yaw*180/Math.PI)%360+360)%360;
+
+  instr("ALT", Math.max(0,AGL|0)+"", 0.10, db+26);
+  instr("SPD", (spd|0)+"", 0.26, db+26);
+  instr("HDG", (hdg|0).toString().padStart(3,"0")+"°", 0.42, db+26);
+  // fuel bar
+  fuelBar(0.58*W, db+22, 0.16*W, 10, fuel/FUEL_MAX);
+  // rescue counter
+  ctx.fillStyle = "#8dffb0";
+  ctx.font = "bold 11px 'Courier New', monospace";
+  ctx.textAlign="center";
+  ctx.fillText("RESCUED "+rescues+" / "+TARGET, 0.78*W, db+24);
+  ctx.fillStyle = passenger ? "#ffb347" : "#41534f";
+  ctx.fillText(passenger?"ABOARD: 1":"ABOARD: 0", 0.78*W, db+38);
+
+  // --- radio compass (top-right) ---
+  drawRadio();
+
+  // --- rotor throb (subtle) ---
+  const throb = 0.5+0.5*Math.sin(time*40);
+  ctx.fillStyle = "rgba(0,0,0,"+(0.05+throb*0.05)+")";
+  ctx.fillRect(0,0,W, 4+throb*3);
+
+  // --- prompts / warnings ---
+  drawPrompts(AGL, spd);
+}
+
+function instr(label, val, fx, y){
+  const x = fx*W;
+  ctx.fillStyle = "#3f5a54";
+  ctx.font = "8px 'Courier New', monospace";
+  ctx.textAlign="center";
+  ctx.fillText(label, x, y-6);
+  ctx.fillStyle = "#d7fff2";
+  ctx.font = "bold 13px 'Courier New', monospace";
+  ctx.fillText(val, x, y+8);
+}
+function fuelBar(x,y,w,hh,frac){
+  ctx.fillStyle = "#0e161a";
+  ctx.fillRect(x,y,w,hh);
+  ctx.strokeStyle = "rgba(120,180,170,0.3)"; ctx.strokeRect(x+0.5,y+0.5,w-1,hh-1);
+  const c = frac>0.4 ? "#7ed957" : (frac>0.2 ? "#ffb347" : "#ff5a4d");
+  ctx.fillStyle = c;
+  ctx.fillRect(x+1, y+1, (w-2)*clamp(frac,0,1), hh-2);
+  ctx.fillStyle = "#3f5a54";
+  ctx.font = "8px 'Courier New', monospace"; ctx.textAlign="center";
+  ctx.fillText("FUEL", x+w/2, y-4);
+}
+
+function drawRadio(){
+  const cx = W-46, cy = 40, rr = 26;
+  ctx.save();
+  ctx.fillStyle = "rgba(8,12,14,0.7)";
+  ctx.beginPath(); ctx.arc(cx,cy,rr+5,0,TAU); ctx.fill();
+  ctx.strokeStyle = "rgba(120,180,170,0.35)"; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.arc(cx,cy,rr,0,TAU); ctx.stroke();
+  // ticks
+  ctx.strokeStyle = "rgba(120,180,170,0.5)";
+  for(let i=0;i<12;i++){
+    const a = i/12*TAU;
+    ctx.beginPath();
+    ctx.moveTo(cx+Math.sin(a)*(rr-3), cy-Math.cos(a)*(rr-3));
+    ctx.lineTo(cx+Math.sin(a)*rr,     cy-Math.cos(a)*rr);
+    ctx.stroke();
+  }
+  const {s,d} = nearestSurvivor();
+  if(s && d < SIGNAL_RANGE){
+    // bearing relative to heading
+    let rel = Math.atan2(s.x-heli.x, s.z-heli.z) - heli.yaw;
+    rel = ((rel%TAU)+TAU)%TAU;
+    // jitter for flavor
+    rel += rand(-0.03,0.03);
+    const bx = cx + Math.sin(rel)*(rr-8);
+    const by = cy - Math.cos(rel)*(rr-8);
+    const on = (time*3|0)%2===0;
+    ctx.fillStyle = on ? "#ffb347" : "#7a5a2a";
+    ctx.beginPath(); ctx.arc(bx,by,2.4,0,TAU); ctx.fill();
+    // range readout
+    ctx.fillStyle = "#8fd0c4"; ctx.font="8px 'Courier New', monospace"; ctx.textAlign="center";
+    ctx.fillText((d|0)+"m", cx, cy+rr+14);
+    if(!radioLocked){ radioLocked=true; sfx.lock(); }
+  }else{
+    radioLocked=false;
+    ctx.fillStyle = "#41534f"; ctx.font="8px 'Courier New', monospace"; ctx.textAlign="center";
+    ctx.fillText("STATIC", cx, cy+rr+14);
+    // faint static blips
+    if((time*7|0)%3===0){
+      ctx.fillStyle="rgba(120,180,170,0.4)";
+      ctx.fillRect(cx+rand(-rr,rr), cy+rand(-rr,rr), 1, 1);
+    }
+  }
+  ctx.restore();
+}
+
+function drawPrompts(AGL, spd){
+  ctx.textAlign="center";
+  if(sub==="fly" && canRescue()){
+    const {s} = nearestSurvivor();
+    ctx.fillStyle = "rgba(8,12,14,0.7)";
+    const msg = "PRESS  [E]  TO RESCUE";
+    ctx.font = "bold 12px 'Courier New', monospace";
+    const w = ctx.measureText(msg).width + 26;
+    ctx.fillRect(W/2-w/2, H*0.6, w, 22);
+    ctx.fillStyle = "#8dffb0";
+    ctx.fillText(msg, W/2, H*0.6+15);
+  }
+  if(sub==="board"){
+    ctx.fillStyle = "rgba(8,12,14,0.7)";
+    const msg = "SURVIVOR ABOARD - RETURN TO BASE";
+    ctx.font = "bold 12px 'Courier New', monospace";
+    const w = ctx.measureText(msg).width + 26;
+    ctx.fillRect(W/2-w/2, H*0.6, w, 22);
+    ctx.fillStyle = "#ffb347";
+    ctx.fillText(msg, W/2, H*0.6+15);
+  }
+  if(sub==="hostile"){
+    // red alarm frame + countdown
+    const a = 0.4+0.3*Math.sin(time*18);
+    ctx.strokeStyle = "rgba(255,60,50,"+a+")"; ctx.lineWidth=4;
+    ctx.strokeRect(6,6,W-12,H-12);
+    ctx.fillStyle = "rgba(20,4,4,0.8)";
+    const msg = "IT IS NOT HUMAN!  GET AIRBORNE!";
+    ctx.font = "bold 14px 'Courier New', monospace";
+    const w = ctx.measureText(msg).width + 30;
+    ctx.fillRect(W/2-w/2, H*0.3, w, 26);
+    ctx.fillStyle = "#ff6a5a";
+    ctx.fillText(msg, W/2, H*0.3+18);
+    ctx.fillStyle = "#ffd24a";
+    ctx.font = "bold 20px 'Courier New', monospace";
+    ctx.fillText(Math.ceil(hostileTimer)+"", W/2, H*0.3+52);
+  }
+  // passenger silhouette in cockpit corner
+  if(passenger){
+    ctx.save();
+    ctx.translate(W-30, H*0.66);
+    ctx.fillStyle = "rgb(60,50,48)";
+    ctx.fillRect(-6,-2,12,10);
+    ctx.fillStyle = "rgb(210,180,150)";
+    ctx.beginPath(); ctx.arc(0,-6,4,0,TAU); ctx.fill();
+    ctx.restore();
+  }
+}
+
+/* ============================================================
+   MAIN LOOP
+   ============================================================ */
+let last = performance.now();
+function frame(now){
+  let dt = (now-last)/1000; last = now;
+  if(dt > 0.05) dt = 0.05;          // clamp big steps
+  time += dt;
+
+  if(state==="play"){
+    updateFlight(dt);
+    if(state==="play"){
+      updateSub(dt);
+      if(state==="play") checkBaseReturn();
+    }
+  } else if(state==="menu"){
+    // slow orbiting showcase of the world behind the start screen
+    heli.yaw += dt*0.10;
+    heli.pitch = Math.sin(time*0.25)*0.12 - 0.05;
+    heli.roll  = Math.cos(time*0.18)*0.06;
+  }
+
+  // render (always, so background shows behind menus)
+  ctx.clearRect(0,0,W,H);
+  drawSky();
+  drawTerrain();
+  drawBase();
+  drawSurvivors();
+  drawCockpit();
+
+  // adaptive render radius
+  frameMs = lerp(frameMs, dt*1000, 0.05);
+  if(state==="play"){
+    if(frameMs > 26 && renderR > 22) renderR -= 1;
+    else if(frameMs < 15 && renderR < 34) renderR += 1;
+  }
+
+  requestAnimationFrame(frame);
+}
+
+// boot a live background scene so the menu shows the world
+heli = makeHeli();
+heli.x = 0; heli.z = -560; heli.y = terrainH(0,-560) + 210; heli.yaw = 0;
+genSurvivors();
+rescues = 0; passenger = false; fuel = FUEL_MAX; time = 0; sub = "fly";
+
+
+requestAnimationFrame(frame);
+
+})();
+</script>
+</body>
+</html>

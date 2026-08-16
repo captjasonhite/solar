@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>BedRhythm — Motion & Rhythm Tracker</title>
+<style>
+  :root {
+    --bg-deep: #060918;
+    --bg-mid: #0d1230;
+    --panel: rgba(16, 22, 54, 0.72);
+    --panel-border: rgba(99, 102, 241, 0.25);
+    --text: #e2e8f0;
+    --text-dim: #8b93b8;
+    --neon: #22d3ee;
+    --magenta: #f0f;
+    --violet: #8b5cf6;
+    --good: #34d399;
+    --warn: #fbbf24;
+    --bad: #f87171;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    background: var(--bg-deep);
+    color: var(--text);
+    overflow-x: hidden;
+    overscroll-behavior: none;
+  }
+  #bgGlow {
+    position: fixed; inset: 0; z-index: -1;
+    background: radial-gradient(ellipse at 50% 40%, #0d1230 0%, #060918 70%);
+    transition: none;
+  }
+  .screen {
+    min-height: 100vh;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 48px;
+    max-width: 560px;
+    margin: 0 auto;
+  }
+  .screen.active { display: flex; }
+
+  h1 {
+    font-size: 1.9rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    background: linear-gradient(90deg, var(--neon), var(--violet), var(--magenta));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    margin-bottom: 6px;
+    text-align: center;
+  }
+  .subtitle { color: var(--text-dim); font-size: 0.85rem; text-align: center; margin-bottom: 28px; line-height: 1.5; }
+
+  .card {
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 18px;
+    padding: 20px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+  }
+  .card + .card { margin-top: 14px; }
+
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 15px 20px;
+    border: none;
+    border-radius: 14px;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.2s ease, opacity 0.2s;
+    color: #060918;
+    background: linear-gradient(90deg, var(--neon), var(--violet));
+    box-shadow: 0 0 24px rgba(34, 211, 238, 0.35);
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+  .btn.secondary {
+    background: rgba(99, 102, 241, 0.15);
+    color: var(--text);
+    border: 1px solid var(--panel-border);
+    box-shadow: none;
+  }
+  .btn.danger {
+    background: linear-gradient(90deg, #f87171, #f0f);
+    box-shadow: 0 0 24px rgba(248, 113, 113, 0.3);
+  }
+  .btn.small { padding: 10px 14px; font-size: 0.85rem; width: auto; }
+
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    margin-top: 14px;
+    line-height: 1.5;
+  }
+  .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--bad);
+    flex-shrink: 0;
+    box-shadow: 0 0 8px currentColor;
+  }
+  .dot.ok { background: var(--good); }
+  .dot.warn { background: var(--warn); }
+
+  /* ---- Live screen ---- */
+  #liveScreen { padding-bottom: 24px; }
+  #liveTop {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+  }
+  #duration {
+    font-size: 2.4rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 18px rgba(34, 211, 238, 0.5);
+  }
+  #intensityPct {
+    font-size: 1.6rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: var(--neon);
+    text-shadow: 0 0 14px rgba(34, 211, 238, 0.6);
+  }
+  #liveCanvas {
+    width: 100%;
+    height: 190px;
+    display: block;
+    border-radius: 14px;
+    background: rgba(4, 6, 20, 0.6);
+    border: 1px solid var(--panel-border);
+  }
+  #orbWrap {
+    flex: 1;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 180px;
+  }
+  #orb {
+    width: 70px; height: 70px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #a5f3fc, var(--neon) 45%, var(--violet) 80%);
+    box-shadow: 0 0 40px rgba(34, 211, 238, 0.55), 0 0 90px rgba(139, 92, 246, 0.3);
+    transition: transform 0.1s linear;
+    will-change: transform;
+  }
+  .metricsRow {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    width: 100%;
+    margin-bottom: 14px;
+  }
+  .metric {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 10px 8px;
+    text-align: center;
+  }
+  .metric .label { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin-bottom: 4px; }
+  .metric .value { font-size: 1.05rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+  /* ---- Calibration overlay ---- */
+  #calibOverlay {
+    position: fixed; inset: 0; z-index: 50;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(4, 6, 20, 0.92);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  #calibOverlay.active { display: flex; }
+  #calibRing {
+    width: 120px; height: 120px;
+    border-radius: 50%;
+    border: 4px solid rgba(34, 211, 238, 0.2);
+    border-top-color: var(--neon);
+    animation: spin 1s linear infinite;
+    margin-bottom: 24px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #calibText { font-size: 1.1rem; font-weight: 700; text-align: center; }
+  #calibSub { color: var(--text-dim); font-size: 0.85rem; margin-top: 8px; text-align: center; padding: 0 32px; }
+
+  /* ---- Review screen ---- */
+  #reviewCanvas {
+    width: 100%;
+    height: 200px;
+    display: block;
+    border-radius: 14px;
+    background: rgba(4, 6, 20, 0.6);
+    border: 1px solid var(--panel-border);
+    margin-bottom: 16px;
+  }
+  .grade {
+    font-size: 3.4rem;
+    font-weight: 900;
+    text-align: center;
+    margin: 4px 0 2px;
+    text-shadow: 0 0 30px rgba(34, 211, 238, 0.6);
+  }
+  .gradeLabel { text-align: center; color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px; }
+  .reviewGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .reviewGrid .metric { padding: 14px 8px; }
+  .reviewGrid .metric .value { font-size: 1.3rem; }
+
+  /* ---- History ---- */
+  .histRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 4px;
+    border-bottom: 1px solid rgba(99, 102, 241, 0.15);
+    font-size: 0.88rem;
+  }
+  .histRow:last-child { border-bottom: none; }
+  .histDate { font-weight: 700; }
+  .histMeta { color: var(--text-dim); font-size: 0.75rem; margin-top: 2px; }
+  .histAvg { font-weight: 800; font-variant-numeric: tabular-nums; color: var(--neon); }
+  .empty { color: var(--text-dim); text-align: center; padding: 24px 0; font-size: 0.85rem; }
+
+  .sectionTitle { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-dim); margin-bottom: 12px; }
+  .btnRow { display: flex; gap: 10px; width: 100%; margin-top: 14px; flex-wrap: wrap; }
+  .btnRow .btn { flex: 1; }
+
+  .toast {
+    position: fixed;
+    bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: rgba(16, 22, 54, 0.95);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 12px 20px;
+    font-size: 0.85rem;
+    z-index: 100;
+    transition: transform 0.3s ease;
+    max-width: 90vw;
+    text-align: center;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  @media (min-width: 640px) {
+    .screen { padding-top: 48px; }
+    #liveCanvas { height: 240px; }
+  }
+</style>
+</head>
+<body>
+<div id="bgGlow"></div>
+
+<!-- ============ SETUP SCREEN ============ -->
+<div class="screen active" id="setupScreen">
+  <h1>BedRhythm</h1>
+  <p class="subtitle">Place your phone flat on the mattress.<br>Tracks motion intensity &amp; rhythm over time.</p>
+
+  <div class="card">
+    <div class="sectionTitle">Sensor Status</div>
+    <div class="status" id="permStatus">
+      <div class="dot" id="permDot"></div>
+      <span id="permText">Checking sensor availability…</span>
+    </div>
+    <div class="btnRow">
+      <button class="btn secondary" id="permBtn" style="display:none">Enable Motion Access</button>
+      <button class="btn secondary" id="retestBtn">Retest Sensor</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="sectionTitle">How it works</div>
+    <div class="status" style="margin-top:0">
+      <span style="font-size:0.85rem">1. Grant motion permission (iOS 13+).<br>2. Lay the phone face-up on the mattress.<br>3. Start — a 5-second calibration measures ambient mattress noise and auto-balances sensitivity.</span>
+    </div>
+  </div>
+
+  <div class="btnRow">
+    <button class="btn" id="startBtn" disabled>Start Session</button>
+  </div>
+  <div class="btnRow">
+    <button class="btn secondary" id="historyBtn">Session History</button>
+  </div>
+</div>
+
+<!-- ============ LIVE SCREEN ============ -->
+<div class="screen" id="liveScreen">
+  <div id="liveTop">
+    <div id="duration">00:00</div>
+    <div id="intensityPct">0%</div>
+  </div>
+  <canvas id="liveCanvas"></canvas>
+  <div id="orbWrap"><div id="orb"></div></div>
+  <div class="metricsRow">
+    <div class="metric"><div class="label">Avg Intensity</div><div class="value" id="mAvg">0%</div></div>
+    <div class="metric"><div class="label">Peak</div><div class="value" id="mPeak">0%</div></div>
+    <div class="metric"><div class="label">Rhythm</div><div class="value" id="mRhythm">—</div></div>
+  </div>
+  <div class="btnRow">
+    <button class="btn danger" id="stopBtn">End Session</button>
+  </div>
+</div>
+
+<!-- ============ CALIBRATION OVERLAY ============ -->
+<div id="calibOverlay">
+  <div id="calibRing"></div>
+  <div id="calibText">Calibrating…</div>
+  <div id="calibSub">Keep the phone still on the mattress. Measuring ambient noise floor.</div>
+</div>
+
+<!-- ============ REVIEW SCREEN ============ -->
+<div class="screen" id="reviewScreen">
+  <h1>Session Complete</h1>
+  <div class="grade" id="rGrade">A</div>
+  <div class="gradeLabel" id="rGradeLabel">Solid rhythm!</div>
+  <canvas id="reviewCanvas"></canvas>
+  <div class="card">
+    <div class="reviewGrid">
+      <div class="metric"><div class="label">Duration</div><div class="value" id="rDuration">00:00</div></div>
+      <div class="metric"><div class="label">Peak Intensity</div><div class="value" id="rPeak">0%</div></div>
+      <div class="metric"><div class="label">Avg Intensity</div><div class="value" id="rAvg">0%</div></div>
+      <div class="metric"><div class="label">Rhythm Score</div><div class="value" id="rRhythm">—</div></div>
+    </div>
+  </div>
+  <div class="btnRow">
+    <button class="btn" id="csvBtn">Download CSV</button>
+    <button class="btn secondary" id="reviewHistoryBtn">History</button>
+  </div>
+  <div class="btnRow">
+    <button class="btn secondary" id="againBtn">New Session</button>
+  </div>
+</div>
+
+<!-- ============ HISTORY SCREEN ============ -->
+<div class="screen" id="historyScreen">
+  <h1>Session History</h1>
+  <p class="subtitle">Saved locally on this device.</p>
+  <div class="card" style="flex:1">
+    <div id="histList"></div>
+  </div>
+  <div class="btnRow">
+    <button class="btn secondary" id="histClearBtn">Clear History</button>
+    <button class="btn" id="histBackBtn">Back</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---------- DOM ----------
+  const $ = (id) => document.getElementById(id);
+  const screens = { setup: $('setupScreen'), live: $('liveScreen'), review: $('reviewScreen'), history: $('historyScreen') };
+  const bgGlow = $('bgGlow');
+  const liveCanvas = $('liveCanvas');
+  const reviewCanvas = $('reviewCanvas');
+  const orb = $('orb');
+  const toastEl = $('toast');
+
+  function showScreen(name) {
+    for (const k in screens) screens[k].classList.toggle('active', k === name);
+    window.scrollTo(0, 0);
+  }
+  function toast(msg, ms) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => toastEl.classList.remove('show'), ms || 2600);
+  }
+
+  // ---------- Sensor state ----------
+  let motionOK = false;
+  let permState = 'unknown'; // unknown | granted | denied | unsupported
+  let calib = { baseline: 4, gain: 1 }; // ambient noise floor (mg^2-ish) and auto gain
+  let session = null;
+  let rafId = null;
+  let motionHandler = null;
+
+  const A = 9.81; // m/s^2
+  const LIVE_WINDOW_S = 15;
+  const LIVE_SAMPLE_MS = 50; // one live-graph sample per 50ms (rolling)
+  const REC_SAMPLE_MS = 1000; // one CSV record per second
+
+  function startMotion() {
+    if (motionHandler) return;
+    motionHandler = (e) => {
+      const a = e.accelerationIncludingGravity;
+      if (!a || a.x == null || a.y == null || a.z == null) return;
+      if (!motionOK) { motionOK = true; setPermUI(); }
+      onMotion(a.x, a.y, a.z);
+    };
+    window.addEventListener('devicemotion', motionHandler);
+    setPermUI();
+  }
+
+  function stopMotion() {
+    if (motionHandler) {
+      window.removeEventListener('devicemotion', motionHandler);
+      motionHandler = null;
+    }
+  }
+
+  function setPermUI() {
+    const dot = $('permDot'), txt = $('permText'), btn = $('permBtn');
+    if (permState === 'insecure') {
+      dot.className = 'dot';
+      txt.textContent = 'Sensors are blocked: this page is not on a secure connection. Android Chrome only exposes the accelerometer over HTTPS or localhost. Serve the file over HTTPS (e.g. host on GitHub Pages / Netlify, or run a local HTTPS server) and reload.';
+      btn.style.display = 'none';
+      $('startBtn').disabled = true;
+    } else if (permState === 'unsupported') {
+      dot.className = 'dot';
+      txt.textContent = 'No motion events received. The accelerometer exists on this phone, but the browser is not delivering sensor data. Try: 1) Chrome or Samsung Internet (not a privacy browser), 2) an HTTPS or localhost URL, 3) tap Retest after moving the phone.';
+      btn.style.display = 'none';
+      $('startBtn').disabled = true;
+    } else if (permState === 'granted') {
+      dot.className = 'dot ok';
+      txt.textContent = motionOK ? 'Motion sensor active. Ready to start.' : 'Permission granted. Tap Start Session.';
+      btn.style.display = 'none';
+      $('startBtn').disabled = false;
+    } else if (permState === 'denied') {
+      dot.className = 'dot';
+      txt.textContent = 'Motion permission denied. On iOS, go to Settings → Privacy & Security → Motion & Fitness → Motion & Fitness Services → enable for this site, then reload.';
+      btn.style.display = 'none';
+      $('startBtn').disabled = true;
+    } else {
+      dot.className = 'dot warn';
+      txt.textContent = 'Motion access requires your permission (iOS 13+). Tap the button below, then lay the phone on the mattress.';
+      btn.style.display = 'block';
+      $('startBtn').disabled = true;
+    }
+  }
+
+  // iOS 13+ permission
+  let permRequested = false;
+  function requestMotionPermission() {
+    permRequested = true;
+    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+      DeviceMotionEvent.requestPermission()
+        .then((res) => {
+          permState = res === 'granted' ? 'granted' : 'denied';
+          if (permState === 'granted') startMotion();
+          setPermUI();
+          if (permState === 'denied') toast('Permission denied — see instructions above.');
+        })
+        .catch(() => { permState = 'denied'; setPermUI(); });
+    } else {
+      // Non-iOS: permission is implicit; just listen. motionOK flips on first real event.
+      startMotion();
+      permState = 'granted';
+      setPermUI();
+    }
+  }
+
+  // Detect sensor support (no motion events after a grace period => likely unsupported)
+  let probeTimer = null;
+  function probeSensor() {
+    if (!window.isSecureContext) {
+      permState = 'insecure';
+      setPermUI();
+      return;
+    }
+    if (typeof DeviceMotionEvent === 'undefined') {
+      permState = 'unsupported';
+      setPermUI();
+      return;
+    }
+    permState = 'unknown';
+    setPermUI();
+    let got = false;
+    const probe = (e) => {
+      if (e.accelerationIncludingGravity && e.accelerationIncludingGravity.x != null) got = true;
+    };
+    window.addEventListener('devicemotion', probe);
+    if (probeTimer) clearTimeout(probeTimer);
+    probeTimer = setTimeout(() => {
+      window.removeEventListener('devicemotion', probe);
+      // Don't clobber a state the user already resolved (e.g. quick permission grant)
+      if (permState !== 'unknown' || permRequested) return;
+      if (typeof DeviceMotionEvent.requestPermission === 'function') {
+        permState = 'unknown'; // needs explicit grant
+      } else if (got) {
+        permState = 'granted';
+        startMotion();
+      } else {
+        // May still work once the page is interacted with; mark as needing permission button anyway on iOS
+        if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+          permState = 'unknown';
+        } else {
+          permState = 'unsupported';
+        }
+      }
+      setPermUI();
+    }, 2500);
+  }
+
+  // ---------- Motion math ----------
+  // Intensity: deviation from calibrated baseline, in mg units, auto-gained to 0-100%.
+  let curMag = 0;      // smoothed magnitude of motion (mg^2 scale)
+  let curIntensity = 0; // 0..100
+
+  function onMotion(x, y, z) {
+    if (!session) return;
+    // Remove gravity component: on a flat phone, gravity ≈ (0,0,±g).
+    // Use magnitude of accelerationIncludingGravity minus 1g as a motion proxy.
+    const mag = Math.sqrt(x * x + y * y + z * z) / A; // in g
+    const motion = Math.max(0, mag - 1); // strip rest gravity
+    const m2 = motion * motion;
+    // Exponential smoothing (~150ms)
+    curMag += (m2 - curMag) * 0.25;
+
+    const raw = (curMag - calib.baseline) * calib.gain;
+    const target = Math.max(0, Math.min(100, raw * 100));
+    curIntensity += (target - curIntensity) * 0.3;
+
+    const now = performance.now();
+    session.liveBuffer.push({ t: now, v: curIntensity });
+    while (session.liveBuffer.length > 2 && now - session.liveBuffer[0].t > LIVE_WINDOW_S * 1000 + 200) {
+      session.liveBuffer.shift();
+    }
+
+    // Second-by-second recording (only after calibration completes)
+    if (session.running && now - session.lastRec >= REC_SAMPLE_MS) {
+      session.lastRec = now;
+      const rec = {
+        ts: new Date().toISOString(),
+        intensity: Math.round(curIntensity * 10) / 10,
+        x: Math.round(x * 1000) / 1000,
+        y: Math.round(y * 1000) / 1000,
+        z: Math.round(z * 1000) / 1000
+      };
+      session.records.push(rec);
+      session.peak = Math.max(session.peak, curIntensity);
+      session.sum += curIntensity;
+      // Pulse detection for rhythm: local maxima above threshold (numeric ms timestamp)
+      detectPulse(curIntensity, Date.now());
+    }
+  }
+
+  // ---------- Rhythm Consistency Index ----------
+  // Based on variance of inter-pulse intervals (lower variance => higher consistency).
+  function detectPulse(v, ts) {
+    const s = session;
+    const TH = 12; // min intensity to count as a pulse
+    if (v > TH && v >= s._prevV && s._prevV >= s._prev2V) {
+      // local max
+      if (s._lastPulseTs && (ts - s._lastPulseTs) > 800) { // min 0.8s between pulses
+        if (s._prevPulseTs) s.pulseIntervals.push(ts - s._prevPulseTs);
+        s._prevPulseTs = ts;
+        s._lastPulseTs = ts;
+      }
+    }
+    s._prev2V = s._prevV;
+    s._prevV = v;
+  }
+
+  function rhythmIndex(intervals) {
+    if (intervals.length < 3) return null;
+    const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    if (mean <= 0) return null;
+    const variance = intervals.reduce((a, b) => a + (b - mean) * (b - mean), 0) / intervals.length;
+    const cv = Math.sqrt(variance) / mean; // coefficient of variation
+    // CV 0 = perfectly regular => 100; CV >= 1 => 0
+    return Math.max(0, Math.min(100, Math.round((1 - cv) * 100)));
+  }
+
+  // ---------- Calibration ----------
+  let calibTimer = null;
+  function runCalibration(onDone) {
+    const overlay = $('calibOverlay');
+    overlay.classList.add('active');
+    const samples = [];
+    const t0 = performance.now();
+    const step = () => {
+      const el = performance.now() - t0;
+      const remain = Math.max(0, 5 - el / 1000);
+      $('calibText').textContent = 'Calibrating… ' + remain.toFixed(1) + 's';
+      samples.push(curMag);
+      if (el < 5000) {
+        calibTimer = requestAnimationFrame(step);
+      } else {
+        overlay.classList.remove('active');
+        cancelAnimationFrame(calibTimer);
+        samples.sort((a, b) => a - b);
+        // baseline = median of ambient samples (robust to blips)
+        const baseline = samples[Math.floor(samples.length / 2)] || 0.0004;
+        // Auto-balance gain: map a "typical" motion magnitude (baseline + 0.004 g^2) to ~50%
+        const scale = 0.004;
+        const gain = 1 / Math.max(baseline + scale, scale);
+        calib = { baseline: baseline, gain: gain };
+        curMag = baseline;
+        onDone();
+        toast('Calibrated. Baseline: ' + (baseline * 1000).toFixed(2) + ' mg²');
+      }
+    };
+    calibTimer = requestAnimationFrame(step);
+  }
+
+  // ---------- Session lifecycle ----------
+  function startSession() {
+    if (permState !== 'granted' || !motionOK) { toast('Motion sensor not ready. Grant permission first.'); return; }
+    session = {
+      startWall: Date.now(),
+      startPerf: performance.now(),
+      liveBuffer: [],
+      records: [],
+      peak: 0,
+      sum: 0,
+      count: 0,
+      pulseIntervals: [],
+      _prevV: -1, _prev2V: -1, _lastPulseTs: 0, _prevPulseTs: 0,
+      lastRec: performance.now()
+    };
+    curMag = 0;
+    curIntensity = 0;
+    showScreen('live');
+    runCalibration(() => {
+      session.running = true;
+      startRenderLoop();
+    });
+  }
+
+  function endSession() {
+    if (!session) return;
+    if (!session.running) {
+      // Still calibrating — cancel and go back to setup
+      cancelAnimationFrame(calibTimer);
+      $('calibOverlay').classList.remove('active');
+      session = null;
+      showScreen('setup');
+      return;
+    }
+    session.running = false;
+    stopRenderLoop();
+    const durationMs = Date.now() - session.startWall - 5000; // exclude calibration
+    const durationS = Math.max(0, Math.round(durationMs / 1000));
+    const avg = session.count > 0 ? session.sum / session.records.length : 0;
+    const rhythm = rhythmIndex(session.pulseIntervals);
+    const summary = {
+      date: new Date().toISOString(),
+      durationS: durationS,
+      avg: Math.round(avg * 10) / 10,
+      peak: Math.round(session.peak * 10) / 10,
+      rhythm: rhythm,
+      records: session.records
+    };
+    saveSession(summary);
+    showReview(summary);
+  }
+
+  // ---------- Persistence ----------
+  const STORE_KEY = 'bedrhythm_sessions_v1';
+  function loadSessions() {
+    try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
+    catch (e) { return []; }
+  }
+  function saveSession(summary) {
+    const all = loadSessions();
+    all.unshift(summary);
+    // Keep summaries with records; cap storage at ~40 sessions
+    while (all.length > 40) {
+      const dropped = all.pop();
+      if (dropped && dropped.records) dropped.records = dropped.records.slice(0, 1);
+    }
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(all));
+    } catch (e) {
+      // Storage full: drop oldest full record sets
+      for (let i = all.length - 1; i > 0 && e; i--) {
+        all[i].records = all[i].records.slice(0, 1);
+        try { localStorage.setItem(STORE_KEY, JSON.stringify(all)); e = null; }
+        catch (e2) { e = e2; }
+      }
+      if (e) toast('Warning: browser storage is full; oldest sessions may be truncated.');
+    }
+  }
+
+  // ---------- CSV export ----------
+  function downloadCSV(summary) {
+    if (!summary.records || summary.records.length === 0) { toast('No time-series data to export.'); return; }
+    let csv = 'Timestamp,Intensity Percent,X (m/s2),Y (m/s2),Z (m/s2)\n';
+    for (const r of summary.records) {
+      csv += r.ts + ',' + r.intensity + ',' + r.x + ',' + r.y + ',' + r.z + '\n';
+    }
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const d = new Date(summary.date);
+    a.href = url;
+    a.download = 'bedrhythm_' + d.toISOString().slice(0, 10) + '_' + d.toTimeString().slice(0, 5).replace(':', '') + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    toast('CSV downloaded (' + summary.records.length + ' rows).');
+  }
+
+  // ---------- Grading ----------
+  function gradeFor(summary) {
+    let score = 0;
+    score += Math.min(summary.avg, 60) * 0.9;                 // activity level (up to ~54)
+    if (summary.rhythm != null) score += summary.rhythm * 0.3; // consistency (up to 30)
+    score += Math.min(summary.peak, 100) * 0.1;                // peak (up to 10)
+    // duration bonus: >= 10 min
+    if (summary.durationS >= 600) score += 6;
+    else if (summary.durationS >= 300) score += 3;
+    score = Math.min(100, score);
+    if (summary.avg < 3 && summary.durationS < 60) {
+      return { letter: '—', label: 'Too short to grade — try a longer session.' };
+    }
+    if (score >= 85) return { letter: 'S', label: 'Elite rhythm. The mattress has never seen its match.' };
+    if (score >= 70) return { letter: 'A', label: 'Solid rhythm with real peaks. Well done.' };
+    if (score >= 55) return { letter: 'B', label: 'Good activity. A little more consistency would top it off.' };
+    if (score >= 40) return { letter: 'C', label: 'Decent movement. Try keeping a steadier pulse.' };
+    if (score >= 25) return { letter: 'D', label: 'Mostly quiet night. The mattress barely felt you.' };
+    return { letter: 'Z', label: 'Deep sleep detected. Zero motion — respect.' };
+  }
+
+  // ---------- Rendering ----------
+  function fitCanvas(cv) {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = cv.getBoundingClientRect();
+    const w = Math.round(rect.width * dpr), h = Math.round(rect.height * dpr);
+    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+    return { ctx: cv.getContext('2d'), w, h };
+  }
+
+  function drawLive() {
+    const { ctx, w, h } = fitCanvas(liveCanvas);
+    ctx.clearRect(0, 0, w, h);
+    const buf = session ? session.liveBuffer : [];
+    if (buf.length < 2) return;
+    const now = performance.now();
+    const xFor = (t) => w - ((now - t) / (LIVE_WINDOW_S * 1000)) * w;
+
+    // grid lines
+    ctx.strokeStyle = 'rgba(99, 102, 241, 0.12)';
+    ctx.lineWidth = 1;
+    for (let i = 1; i < 4; i++) {
+      const y = (h / 4) * i;
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    }
+
+    const grad = ctx.createLinearGradient(0, 0, w, 0);
+    grad.addColorStop(0, 'rgba(34, 211, 238, 0.25)');
+    grad.addColorStop(1, 'rgba(240, 0, 255, 0.9)');
+
+    // area fill
+    ctx.beginPath();
+    ctx.moveTo(xFor(buf[0].t), h);
+    for (const p of buf) ctx.lineTo(xFor(p.t), h - (p.v / 100) * (h - 8) - 4);
+    ctx.lineTo(xFor(buf[buf.length - 1].t), h);
+    ctx.closePath();
+    const fill = ctx.createLinearGradient(0, 0, 0, h);
+    fill.addColorStop(0, 'rgba(139, 92, 246, 0.28)');
+    fill.addColorStop(1, 'rgba(34, 211, 238, 0.02)');
+    ctx.fillStyle = fill;
+    ctx.fill();
+
+    // line
+    ctx.beginPath();
+    for (let i = 0; i < buf.length; i++) {
+      const x = xFor(buf[i].t), y = h - (buf[i].v / 100) * (h - 8) - 4;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'round';
+    ctx.shadowColor = 'rgba(34, 211, 238, 0.6)';
+    ctx.shadowBlur = 10;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  function drawReview() {
+    const { ctx, w, h } = fitCanvas(reviewCanvas);
+    ctx.clearRect(0, 0, w, h);
+    const recs = reviewData ? reviewData.records : [];
+    if (recs.length < 2) {
+      ctx.fillStyle = 'rgba(139, 147, 184, 0.6)';
+      ctx.font = '13px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Not enough data for a timeline', w / 2, h / 2);
+      return;
+    }
+    const n = recs.length;
+    // downsample to at most w points
+    const stride = Math.max(1, Math.floor(n / w));
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    for (let i = 0; i < n; i += stride) {
+      const x = (i / (n - 1)) * w;
+      const y = h - (recs[i].intensity / 100) * (h - 8) - 4;
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(w, h);
+    ctx.closePath();
+    const fill = ctx.createLinearGradient(0, 0, 0, h);
+    fill.addColorStop(0, 'rgba(139, 92, 246, 0.35)');
+    fill.addColorStop(1, 'rgba(34, 211, 238, 0.02)');
+    ctx.fillStyle = fill;
+    ctx.fill();
+
+    ctx.beginPath();
+    for (let i = 0; i < n; i += stride) {
+      const x = (i / (n - 1)) * w;
+      const y = h - (recs[i].intensity / 100) * (h - 8) - 4;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    const grad = ctx.createLinearGradient(0, 0, w, 0);
+    grad.addColorStop(0, '#22d3ee');
+    grad.addColorStop(1, '#f0f');
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // axis labels
+    ctx.fillStyle = 'rgba(139, 147, 184, 0.7)';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('0%', 4, h - 4);
+    ctx.fillText('100%', 4, 12);
+    ctx.textAlign = 'right';
+    const m = Math.floor(n / 60);
+    ctx.fillText(m > 0 ? m + 'm' : n + 's', w - 4, h - 4);
+  }
+
+  let reviewData = null;
+
+  function showReview(summary) {
+    reviewData = summary;
+    const g = gradeFor(summary);
+    $('rGrade').textContent = g.letter;
+    $('rGradeLabel').textContent = g.label;
+    $('rDuration').textContent = fmtDuration(summary.durationS);
+    $('rPeak').textContent = summary.peak + '%';
+    $('rAvg').textContent = summary.avg + '%';
+    $('rRhythm').textContent = summary.rhythm != null ? summary.rhythm + '%' : '—';
+    showScreen('review');
+    drawReview();
+  }
+
+  function fmtDuration(s) {
+    const m = Math.floor(s / 60), ss = s % 60;
+    return String(m).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
+  }
+
+  // ---------- Background & orb animation ----------
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  // intensity 0 -> deep navy, 0.5 -> purple, 1 -> neon magenta
+  function bgColors(v) {
+    const stops = [
+      [0.0, [10, 16, 48]],   // deep navy
+      [0.5, [58, 20, 110]],  // purple
+      [1.0, [160, 10, 150]]  // neon magenta-ish
+    ];
+    let c;
+    if (v <= 0.5) {
+      const t = v / 0.5;
+      c = stops[0][1].map((x, i) => lerp(x, stops[1][1][i], t));
+    } else {
+      const t = (v - 0.5) / 0.5;
+      c = stops[1][1].map((x, i) => lerp(x, stops[2][1][i], t));
+    }
+    const [r, g, b] = c.map(Math.round);
+    return {
+      inner: 'rgba(' + (r + 30) + ',' + (g + 20) + ',' + (b + 40) + ',1)',
+      outer: 'rgb(' + Math.max(4, r - 4) + ',' + Math.max(6, g - 4) + ',' + Math.max(18, b - 4) + ')'
+    };
+  }
+
+  function startRenderLoop() {
+    const tick = () => {
+      if (!session || !session.running) return;
+      const v = curIntensity / 100;
+
+      // background
+      const c = bgColors(v);
+      bgGlow.style.background = 'radial-gradient(ellipse at 50% 40%, ' + c.inner + ' 0%, ' + c.outer + ' 70%)';
+
+      // orb pulse
+      const scale = 1 + v * 2.2;
+      orb.style.transform = 'scale(' + scale.toFixed(3) + ')';
+      const hue = lerp(190, 300, v);
+      orb.style.boxShadow = '0 0 ' + (40 + v * 60) + 'px hsla(' + hue + ',100%,65%,0.55), 0 0 ' + (90 + v * 80) + 'px hsla(' + hue + ',100%,55%,0.3)';
+
+      // HUD
+      const elapsed = Math.max(0, Math.floor((performance.now() - session.startPerf - 5000) / 1000));
+      $('duration').textContent = fmtDuration(elapsed);
+      $('intensityPct').textContent = Math.round(curIntensity) + '%';
+      if (session.records.length > 0) {
+        session.count = session.records.length;
+        $('mAvg').textContent = Math.round(session.sum / session.records.length) + '%';
+      }
+      $('mPeak').textContent = Math.round(session.peak) + '%';
+      const r = rhythmIndex(session.pulseIntervals);
+      $('mRhythm').textContent = r != null ? r + '%' : '—';
+
+      drawLive();
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function stopRenderLoop() {
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = null;
+    bgGlow.style.background = 'radial-gradient(ellipse at 50% 40%, #0d1230 0%, #060918 70%)';
+    orb.style.transform = 'scale(1)';
+  }
+
+  // ---------- History UI ----------
+  function renderHistory() {
+    const list = $('histList');
+    const all = loadSessions();
+    if (all.length === 0) {
+      list.innerHTML = '<div class="empty">No sessions yet.<br>Complete one to see it here.</div>';
+      return;
+    }
+    list.innerHTML = '';
+    all.slice(0, 20).forEach((s, idx) => {
+      const d = new Date(s.date);
+      const row = document.createElement('div');
+      row.className = 'histRow';
+      const dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) +
+        ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+      row.innerHTML =
+        '<div><div class="histDate">' + dateStr + '</div>' +
+        '<div class="histMeta">' + fmtDuration(s.durationS) + (s.rhythm != null ? ' · Rhythm ' + s.rhythm + '%' : '') + '</div></div>' +
+        '<div class="histAvg">' + s.avg + '%</div>';
+      const dl = document.createElement('button');
+      dl.className = 'btn small secondary';
+      dl.textContent = 'CSV';
+      dl.style.marginLeft = '10px';
+      dl.addEventListener('click', () => {
+        if (s.records && s.records.length > 1) downloadCSV(s);
+        else toast('This session has no time-series data to export.');
+      });
+      row.appendChild(dl);
+      list.appendChild(row);
+    });
+  }
+
+  // ---------- Wire up ----------
+  $('permBtn').addEventListener('click', requestMotionPermission);
+  $('retestBtn').addEventListener('click', () => {
+    motionOK = false;
+    permRequested = false;
+    probeSensor();
+  });
+  $('startBtn').addEventListener('click', startSession);
+  $('stopBtn').addEventListener('click', endSession);
+  $('csvBtn').addEventListener('click', () => reviewData && downloadCSV(reviewData));
+  $('againBtn').addEventListener('click', () => showScreen('setup'));
+  $('historyBtn').addEventListener('click', () => { renderHistory(); showScreen('history'); });
+  $('reviewHistoryBtn').addEventListener('click', () => { renderHistory(); showScreen('history'); });
+  $('histBackBtn').addEventListener('click', () => showScreen('setup'));
+  $('histClearBtn').addEventListener('click', () => {
+    localStorage.removeItem(STORE_KEY);
+    renderHistory();
+    toast('History cleared.');
+  });
+
+  window.addEventListener('resize', () => {
+    if (screens.review.classList.contains('active')) drawReview();
+  });
+
+  probeSensor();
+})();
+</script>
+</body>
+</html>
